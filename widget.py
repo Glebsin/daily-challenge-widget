@@ -9,12 +9,12 @@ from PyQt5.QtCore import Qt, QPoint, QPropertyAnimation, QEasingCurve, QRect
 from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineSettings, QWebEngineProfile
 from PyQt5.QtGui import QCursor
 from widget_templates import DEFAULT_TEMPLATE, ALTERNATIVE_TEMPLATE
+from ossapi import Ossapi
 
 class NonClosingMenu(QMenu):
     def mouseReleaseEvent(self, e):
         action = self.activeAction()
         if action and isinstance(action, QWidgetAction):
-            # Для QWidgetAction (поле Scale) игнорируем событие
             e.ignore()
         elif action and action.isEnabled():
             action.trigger()
@@ -22,7 +22,6 @@ class NonClosingMenu(QMenu):
             e.ignore()
             
     def keyPressEvent(self, e):
-        # Предотвращаем закрытие меню при нажатии Enter
         if e.key() == Qt.Key_Return or e.key() == Qt.Key_Enter:
             e.ignore()
         else:
@@ -39,24 +38,26 @@ class TransparentWindow(QMainWindow):
         self.base_width = 150
         self.base_height = 57
         
+        # Настройки osu!api
+        self.osu_client_id = self.settings.get('osu_client_id', '')
+        self.osu_client_secret = self.settings.get('osu_client_secret', '')
+        self.osu_username = self.settings.get('osu_username', '')
+        
         self.key_sequence = []
         self.use_alternative_template = self.settings.get('use_alternative_template', False)
         self.always_on_top = self.settings.get('always_on_top', True)
         self.animation = None
         
-        # Настройки для примагничивания и перемещения стрелками
-        self.snap_distance = 10  # Расстояние притягивания в пикселях
-        self.arrow_step = 2      # Шаг перемещения стрелками в пикселях
+        self.snap_distance = 10
+        self.arrow_step = 2
         
         self.initUI()
         self.oldPos = self.pos()
         
-        # Загружаем и проверяем сохраненную позицию
         pos = self.settings.get('position', {'x': 100, 'y': 100})
         screens = QApplication.screens()
         valid_position = False
 
-        # Увеличиваем зону валидности позиции с учетом текущего масштаба
         current_width = int(self.base_width * (self.scale / 100))
         current_height = int(self.base_height * (self.scale / 100))
         
@@ -73,7 +74,6 @@ class TransparentWindow(QMainWindow):
         if valid_position:
             self.move(pos['x'], pos['y'])
         else:
-            # Размещаем окно в центре основного экрана
             center = QApplication.primaryScreen().geometry().center()
             self.move(center.x() - current_width // 2, center.y() - current_height // 2)
 
@@ -82,7 +82,6 @@ class TransparentWindow(QMainWindow):
             try:
                 with open(self.settings_file, 'r', encoding='utf-8') as f:
                     settings = json.load(f)
-                    # После загрузки настроек устанавливаем состояние always_on_top
                     if 'always_on_top' in settings:
                         self.always_on_top = settings['always_on_top']
                         if not self.always_on_top:
@@ -95,7 +94,6 @@ class TransparentWindow(QMainWindow):
 
     def save_settings(self):
         try:
-            # Получаем актуальную позицию
             current_pos = {
                 'x': int(self.geometry().x()),
                 'y': int(self.geometry().y())
@@ -105,17 +103,18 @@ class TransparentWindow(QMainWindow):
                 'position': current_pos,
                 'scale': self.scale,
                 'use_alternative_template': self.use_alternative_template,
-                'always_on_top': self.always_on_top
+                'always_on_top': self.always_on_top,
+                'osu_client_id': self.osu_client_id,
+                'osu_client_secret': self.osu_client_secret,
+                'osu_username': self.osu_username
             }
             
-            # Записываем во временный файл
             temp_file = self.settings_file + '.tmp'
             with open(temp_file, 'w', encoding='utf-8') as f:
                 json.dump(settings, f, indent=2)
                 f.flush()
                 os.fsync(f.fileno())
             
-            # Атомарно заменяем файл
             if sys.platform == 'win32':
                 if os.path.exists(self.settings_file):
                     os.replace(temp_file, self.settings_file)
@@ -124,17 +123,24 @@ class TransparentWindow(QMainWindow):
             else:
                 os.rename(temp_file, self.settings_file)
                 
-            # Обновляем кэшированные настройки
             self.settings = settings
             
         except Exception as e:
             print(f"Error saving settings: {e}")
-            # В случае ошибки пытаемся сохранить напрямую
             try:
                 with open(self.settings_file, 'w', encoding='utf-8') as f:
                     json.dump(settings, f)
             except Exception as e:
                 print(f"Fatal error saving settings: {e}")
+
+    def update_osu_settings(self, client_id=None, client_secret=None, username=None):
+        if client_id is not None:
+            self.osu_client_id = client_id
+        if client_secret is not None:
+            self.osu_client_secret = client_secret
+        if username is not None:
+            self.osu_username = username
+        self.save_settings()
 
     def toggle_always_on_top(self):
         self.always_on_top = not self.always_on_top
@@ -143,7 +149,7 @@ class TransparentWindow(QMainWindow):
             self.setWindowFlags(flags | Qt.WindowStaysOnTopHint)
         else:
             self.setWindowFlags(flags & ~Qt.WindowStaysOnTopHint)
-        self.show()  # Нужно пересоздать окно после изменения флагов
+        self.show()
         self.save_settings()
 
     def initUI(self):
@@ -154,14 +160,11 @@ class TransparentWindow(QMainWindow):
             flags |= Qt.WindowStaysOnTopHint
         self.setWindowFlags(flags)
         
-        # Устанавливаем размер в соответствии с текущим масштабом
         current_width = int(self.base_width * (self.scale / 100))
         current_height = int(self.base_height * (self.scale / 100))
         
-        # Загружаем сохраненную позицию или используем значения по умолчанию
         pos = self.settings.get('position', {'x': 100, 'y': 100})
         
-        # Устанавливаем геометрию с учетом масштаба
         self.setGeometry(pos['x'], pos['y'], current_width, current_height)
         self.setFixedSize(current_width, current_height)
 
@@ -170,17 +173,15 @@ class TransparentWindow(QMainWindow):
 
         self.webView = QWebEngineView(self)
         
-        # Оптимизация WebEngine
         settings = self.webView.settings()
         settings.setAttribute(QWebEngineSettings.LocalStorageEnabled, False)
         settings.setAttribute(QWebEngineSettings.LocalContentCanAccessRemoteUrls, False)
         settings.setAttribute(QWebEngineSettings.LocalContentCanAccessFileUrls, False)
         settings.setAttribute(QWebEngineSettings.AutoLoadIconsForPage, False)
-        settings.setAttribute(QWebEngineSettings.JavascriptEnabled, False)
+        settings.setAttribute(QWebEngineSettings.JavascriptEnabled, True)
         settings.setAttribute(QWebEngineSettings.ErrorPageEnabled, False)
         settings.setAttribute(QWebEngineSettings.PluginsEnabled, False)
 
-        # Оптимизация профиля
         profile = QWebEngineProfile.defaultProfile()
         profile.clearHttpCache()
         profile.setCachePath("")
@@ -190,12 +191,24 @@ class TransparentWindow(QMainWindow):
 
         self.webView.setFixedSize(current_width, current_height)
         self.webView.setGeometry(0, 0, current_width, current_height)
+
+        additional_style = """
+            * {
+                -webkit-user-select: none !important;
+                -moz-user-select: none !important;
+                -ms-user-select: none !important;
+                user-select: none !important;
+            }
+            ::selection {
+                background: transparent !important;
+            }
+        """
         
         current_template = ALTERNATIVE_TEMPLATE if self.use_alternative_template else DEFAULT_TEMPLATE
         html_content = current_template.format(
-            current_time="2025-05-19 22:22:35",
+            current_time="2025-05-19 23:11:44",
             current_user="Glebsin"
-        )
+        ).replace('</style>', additional_style + '</style>')
         
         self.webView.page().setBackgroundColor(Qt.transparent)
         self.webView.setAttribute(Qt.WA_TransparentForMouseEvents)
@@ -210,34 +223,27 @@ class TransparentWindow(QMainWindow):
         if hasattr(self, 'animation') and self.animation and self.animation.state() == QPropertyAnimation.Running:
             self.animation.stop()
             
-        # Сохраняем текущую позицию левого верхнего угла
         current_pos = self.geometry().topLeft()
         
-        # Вычисляем новые размеры
         new_width = int(self.base_width * (self.scale / 100))
         new_height = int(self.base_height * (self.scale / 100))
         
-        # Создаем новую геометрию, сохраняя позицию левого верхнего угла
         new_geometry = QRect(current_pos.x(), current_pos.y(), new_width, new_height)
         
-        # Создаем и настраиваем анимацию
         self.animation = QPropertyAnimation(self, b"geometry")
         self.animation.setDuration(100)
         self.animation.setStartValue(self.geometry())
         self.animation.setEndValue(new_geometry)
         self.animation.setEasingCurve(QEasingCurve.InOutQuad)
         
-        # Обновляем webView сразу
         self.webView.setFixedSize(new_width, new_height)
         self.webView.setZoomFactor(self.scale / 100)
         
-        # Обработчик завершения анимации
         def onAnimationFinished():
             self.setFixedSize(new_width, new_height)
             if hasattr(self, 'animation'):
                 self.animation.finished.disconnect()
                 self.animation = None
-            # Сохраняем позицию после изменения размера
             QApplication.processEvents()
             self.settings['position'] = {
                 'x': int(self.geometry().x()),
@@ -249,13 +255,11 @@ class TransparentWindow(QMainWindow):
         self.animation.start()
 
     def setScale(self, scale):
-        old_pos = self.geometry().topLeft()  # Сохраняем текущую позицию
+        old_pos = self.geometry().topLeft()
         self.scale = scale
-        # Сразу сохраняем новый масштаб в настройках
         self.settings['scale'] = scale
         self.save_settings()
         self.updateSize()
-        # После изменения размера возвращаем позицию
         self.move(old_pos)
 
     def updateWindowStyle(self):
@@ -290,22 +294,33 @@ class TransparentWindow(QMainWindow):
         settings.setAttribute(QWebEngineSettings.LocalContentCanAccessRemoteUrls, False)
         settings.setAttribute(QWebEngineSettings.LocalContentCanAccessFileUrls, False)
         settings.setAttribute(QWebEngineSettings.AutoLoadIconsForPage, False)
-        settings.setAttribute(QWebEngineSettings.JavascriptEnabled, False)
+        settings.setAttribute(QWebEngineSettings.JavascriptEnabled, True)
         settings.setAttribute(QWebEngineSettings.ErrorPageEnabled, False)
         settings.setAttribute(QWebEngineSettings.PluginsEnabled, False)
         
-        # Устанавливаем размер с учетом текущего масштаба
         current_width = int(self.base_width * (self.scale / 100))
         current_height = int(self.base_height * (self.scale / 100))
         
         self.webView.setFixedSize(current_width, current_height)
         self.webView.setGeometry(0, 0, current_width, current_height)
+
+        additional_style = """
+            * {
+                -webkit-user-select: none !important;
+                -moz-user-select: none !important;
+                -ms-user-select: none !important;
+                user-select: none !important;
+            }
+            ::selection {
+                background: transparent !important;
+            }
+        """
         
         current_template = ALTERNATIVE_TEMPLATE if self.use_alternative_template else DEFAULT_TEMPLATE
         html_content = current_template.format(
-            current_time="2025-05-19 22:22:35",
+            current_time="2025-05-19 23:11:44",
             current_user="Glebsin"
-        )
+        ).replace('</style>', additional_style + '</style>')
         
         self.webView.page().setBackgroundColor(Qt.transparent)
         self.webView.setAttribute(Qt.WA_TransparentForMouseEvents)
@@ -319,7 +334,14 @@ class TransparentWindow(QMainWindow):
         self.save_settings()
 
     def keyPressEvent(self, event):
-        # Сохраняем существующую обработку комбинации клавиш
+        if event.key() == Qt.Key_F4 and event.modifiers() == Qt.AltModifier:
+            self.closeApp()
+            return
+            
+        if event.key() == Qt.Key_A and event.modifiers() == Qt.ControlModifier:
+            event.ignore()
+            return
+            
         self.key_sequence.append(event.key())
         if len(self.key_sequence) > 3:
             self.key_sequence = self.key_sequence[-3:]
@@ -331,7 +353,6 @@ class TransparentWindow(QMainWindow):
             self.key_sequence = []
 
         moved = False
-        # Обработка стрелок без ограничений
         if event.key() == Qt.Key_Left:
             self.move(self.x() - self.arrow_step, self.y())
             moved = True
@@ -346,7 +367,6 @@ class TransparentWindow(QMainWindow):
             moved = True
 
         if moved:
-            # Даем окну время обновить свою позицию
             QApplication.processEvents()
             self.settings['position'] = {
                 'x': int(self.geometry().x()),
@@ -364,11 +384,9 @@ class TransparentWindow(QMainWindow):
         delta = QPoint(event.globalPos() - self.oldPos)
         new_pos = QPoint(self.x() + delta.x(), self.y() + delta.y())
         
-        # Получаем все экраны
         screens = QApplication.screens()
         current_screen = None
         
-        # Определяем, на каком экране находится курсор
         for screen in screens:
             if screen.geometry().contains(event.globalPos()):
                 current_screen = screen
@@ -377,11 +395,9 @@ class TransparentWindow(QMainWindow):
         if not current_screen:
             current_screen = QApplication.primaryScreen()
         
-        # Проверяем близость к краям экрана только если двигаемся медленно
         if abs(delta.x()) < 5 and abs(delta.y()) < 5:
             screen_geo = current_screen.geometry()
             
-            # Проверяем близость к краям экрана с учетом геометрии текущего экрана
             if abs(new_pos.x() - screen_geo.x()) < self.snap_distance:
                 new_pos.setX(screen_geo.x())
             elif abs((screen_geo.x() + screen_geo.width()) - (new_pos.x() + self.width())) < self.snap_distance:
@@ -395,9 +411,7 @@ class TransparentWindow(QMainWindow):
         self.move(new_pos)
         self.oldPos = event.globalPos()
         
-        # Сохраняем позицию только при медленном движении
         if abs(delta.x()) < 5 and abs(delta.y()) < 5:
-            # Обновляем сохраненную позицию
             self.settings['position'] = {
                 'x': int(self.geometry().x()),
                 'y': int(self.geometry().y())
@@ -407,15 +421,13 @@ class TransparentWindow(QMainWindow):
     def createContextMenu(self):
         menu = NonClosingMenu(self)
         
-        # Создаем виджет для поля ввода
+        # Scale widget
         scaleWidget = QWidget()
         scaleLayout = QVBoxLayout(scaleWidget)
         
-        # Добавляем метку со значениями
         scaleLabel = QLabel('Scale, % (100-500)')
         scaleLabel.setStyleSheet("color: white; padding: 2px 0;")
         
-        # Создаем поле ввода
         scaleInput = QLineEdit()
         scaleInput.setText(str(self.scale))
         scaleInput.setFixedWidth(100)
@@ -431,7 +443,6 @@ class TransparentWindow(QMainWindow):
             }
         """)
         
-        # Обработчик изменения масштаба
         def updateScale():
             try:
                 value = int(scaleInput.text())
@@ -445,25 +456,101 @@ class TransparentWindow(QMainWindow):
             except ValueError:
                 scaleInput.setText(str(self.scale))
             finally:
-                # Устанавливаем фокус обратно на поле ввода и выделяем текст
                 scaleInput.setFocus()
                 scaleInput.selectAll()
         
-        # Изменяем обработку события returnPressed
-        def handleReturnPressed():
-            updateScale()
+        scaleInput.returnPressed.connect(updateScale)
         
-        # Подключаем сигнал
-        scaleInput.returnPressed.connect(handleReturnPressed)
-        
-        # Добавляем виджеты в layout
         scaleLayout.addWidget(scaleLabel)
         scaleLayout.addWidget(scaleInput)
         
-        # Создаем действие для добавления виджета в меню
         scaleAction = QWidgetAction(menu)
         scaleAction.setDefaultWidget(scaleWidget)
         menu.addAction(scaleAction)
+        
+        menu.addSeparator()
+
+        # osu!api settings
+        osuWidget = QWidget()
+        osuLayout = QVBoxLayout(osuWidget)
+        
+        # Client ID
+        clientIdLabel = QLabel('osu!api Client ID')
+        clientIdLabel.setStyleSheet("color: white; padding: 2px 0;")
+        clientIdInput = QLineEdit()
+        clientIdInput.setText(self.osu_client_id)
+        clientIdInput.setPlaceholderText("Enter client ID")
+        clientIdInput.setFixedWidth(200)
+        clientIdInput.setStyleSheet("""
+            QLineEdit {
+                background-color: #3D3D3D;
+                color: white;
+                border: 1px solid #4D4D4D;
+                padding: 5px;
+            }
+            QLineEdit:focus {
+                border: 1px solid #4CAF50;
+            }
+        """)
+        
+        # Client Secret
+        clientSecretLabel = QLabel('osu!api Client Secret')
+        clientSecretLabel.setStyleSheet("color: white; padding: 2px 0;")
+        clientSecretInput = QLineEdit()
+        clientSecretInput.setText(self.osu_client_secret)
+        clientSecretInput.setPlaceholderText("Enter client secret")
+        clientSecretInput.setFixedWidth(200)
+        clientSecretInput.setStyleSheet("""
+            QLineEdit {
+                background-color: #3D3D3D;
+                color: white;
+                border: 1px solid #4D4D4D;
+                padding: 5px;
+            }
+            QLineEdit:focus {
+                border: 1px solid #4CAF50;
+            }
+        """)
+        
+        # Username
+        usernameLabel = QLabel('osu! Username')
+        usernameLabel.setStyleSheet("color: white; padding: 2px 0;")
+        usernameInput = QLineEdit()
+        usernameInput.setText(self.osu_username)
+        usernameInput.setPlaceholderText("Enter username")
+        usernameInput.setFixedWidth(200)
+        usernameInput.setStyleSheet("""
+            QLineEdit {
+                background-color: #3D3D3D;
+                color: white;
+                border: 1px solid #4D4D4D;
+                padding: 5px;
+            }
+            QLineEdit:focus {
+                border: 1px solid #4CAF50;
+            }
+        """)
+        
+        def updateOsuSettings():
+            self.update_osu_settings(
+                clientIdInput.text(),
+                clientSecretInput.text(),
+                usernameInput.text()
+            )
+        
+        for input_field in [clientIdInput, clientSecretInput, usernameInput]:
+            input_field.returnPressed.connect(updateOsuSettings)
+        
+        osuLayout.addWidget(clientIdLabel)
+        osuLayout.addWidget(clientIdInput)
+        osuLayout.addWidget(clientSecretLabel)
+        osuLayout.addWidget(clientSecretInput)
+        osuLayout.addWidget(usernameLabel)
+        osuLayout.addWidget(usernameInput)
+        
+        osuAction = QWidgetAction(menu)
+        osuAction.setDefaultWidget(osuWidget)
+        menu.addAction(osuAction)
         
         menu.addSeparator()
 
@@ -483,7 +570,7 @@ class TransparentWindow(QMainWindow):
         
         menu.addSeparator()
         
-        timeAction = QAction('Updated: 2025-05-19 22:22:35', self)
+        timeAction = QAction('Updated: 2025-05-19 23:11:44', self)
         timeAction.setEnabled(False)
         menu.addAction(timeAction)
         
@@ -537,52 +624,33 @@ class TransparentWindow(QMainWindow):
         
         menu.exec_(pos)
         
-        # Устанавливаем фокус на поле ввода при открытии меню
         scaleInput.setFocus()
         scaleInput.selectAll()
 
     def closeApp(self):
-        # Сохраняем текущую позицию
         current_pos = {
             'x': int(self.geometry().x()),
             'y': int(self.geometry().y())
         }
         self.settings['position'] = current_pos
         
-        # Сначала сохраняем настройки
         self.save_settings()
         
-        # Обрабатываем оставшиеся события
         QApplication.processEvents()
         
-        # Затем очищаем и закрываем
         if hasattr(self, 'webView'):
             self.webView.setHtml("")
             self.webView.page().profile().clearAllVisitedLinks()
             self.webView.close()
             self.webView.deleteLater()
-        QApplication.instance().quit()
+
+        raise SystemExit('Exit button pressed')
 
     def closeEvent(self, event):
-        # Сохраняем текущую позицию
-        current_pos = {
-            'x': int(self.geometry().x()),
-            'y': int(self.geometry().y())
-        }
-        self.settings['position'] = current_pos
-        
-        # Сначала сохраняем настройки
-        self.save_settings()
-        
-        # Обрабатываем оставшиеся события
-        QApplication.processEvents()
-        
-        # Затем очищаем и закрываем
-        if hasattr(self, 'webView'):
-            self.webView.setHtml("")
-            self.webView.page().profile().clearAllVisitedLinks()
-            self.webView.close()
-            self.webView.deleteLater()
+        try:
+            self.closeApp()
+        except SystemExit:
+            QApplication.instance().quit()
         event.accept()
 
 if __name__ == '__main__':
