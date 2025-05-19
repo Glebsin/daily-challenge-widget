@@ -5,7 +5,9 @@ i don't know how to code
 how to use:
 
 launch widget.py or download executable in releases;
+
 context menu on right click to use settings 
+
 (scaling, always on top toggle, view update statistic time and username, exit)
 
 functions:
