@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QMenu, QAction, 
                            QWidgetAction, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                            QLineEdit)
-from PyQt5.QtCore import Qt, QPoint, QPropertyAnimation, QEasingCurve, QRect
+from PyQt5.QtCore import Qt, QPoint, QPropertyAnimation, QEasingCurve, QRect, QTimer
 from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineSettings, QWebEngineProfile
 from PyQt5.QtGui import QCursor
 from widget_templates import DEFAULT_TEMPLATE, ALTERNATIVE_TEMPLATE
@@ -76,6 +76,32 @@ class TransparentWindow(QMainWindow):
         else:
             center = QApplication.primaryScreen().geometry().center()
             self.move(center.x() - current_width // 2, center.y() - current_height // 2)
+            
+        # Добавляем таймер для автоматического обновления
+        self.update_timer = QTimer()
+        self.update_timer.timeout.connect(self.update_streak)
+        self.update_timer.start(300000)  # Обновление каждые 5 минут
+
+    def get_daily_streak(self):
+        try:
+            if self.osu_client_id and self.osu_client_secret and self.osu_username:
+                api = Ossapi(self.osu_client_id, self.osu_client_secret)
+                user = api.user(self.osu_username)
+                return f"{user.daily_challenge_user_stats.daily_streak_current}d"
+            return '0d'
+        except Exception as e:
+            print(f"Error getting daily streak: {e}")
+            return '0d'
+
+    def update_streak(self):
+        streak_value = self.get_daily_streak()
+        current_template = ALTERNATIVE_TEMPLATE if self.use_alternative_template else DEFAULT_TEMPLATE
+        html_content = current_template.format(
+            current_time="2025-05-19 23:26:07",
+            current_user="Glebsin",
+            daily_streak=streak_value
+        )
+        self.webView.setHtml(html_content)
 
     def load_settings(self):
         if os.path.exists(self.settings_file):
@@ -205,9 +231,11 @@ class TransparentWindow(QMainWindow):
         """
         
         current_template = ALTERNATIVE_TEMPLATE if self.use_alternative_template else DEFAULT_TEMPLATE
+        streak_value = self.get_daily_streak()
         html_content = current_template.format(
-            current_time="2025-05-19 23:11:44",
-            current_user="Glebsin"
+            current_time="2025-05-19 23:26:07",
+            current_user="Glebsin",
+            daily_streak=streak_value
         ).replace('</style>', additional_style + '</style>')
         
         self.webView.page().setBackgroundColor(Qt.transparent)
@@ -317,9 +345,11 @@ class TransparentWindow(QMainWindow):
         """
         
         current_template = ALTERNATIVE_TEMPLATE if self.use_alternative_template else DEFAULT_TEMPLATE
+        streak_value = self.get_daily_streak()
         html_content = current_template.format(
-            current_time="2025-05-19 23:11:44",
-            current_user="Glebsin"
+            current_time="2025-05-19 23:26:07",
+            current_user="Glebsin",
+            daily_streak=streak_value
         ).replace('</style>', additional_style + '</style>')
         
         self.webView.page().setBackgroundColor(Qt.transparent)
@@ -537,6 +567,7 @@ class TransparentWindow(QMainWindow):
                 clientSecretInput.text(),
                 usernameInput.text()
             )
+            self.update_streak()  # Обновляем значение стрика после изменения настроек
         
         for input_field in [clientIdInput, clientSecretInput, usernameInput]:
             input_field.returnPressed.connect(updateOsuSettings)
@@ -570,7 +601,7 @@ class TransparentWindow(QMainWindow):
         
         menu.addSeparator()
         
-        timeAction = QAction('Updated: 2025-05-19 23:11:44', self)
+        timeAction = QAction('Updated: 2025-05-19 23:26:07', self)
         timeAction.setEnabled(False)
         menu.addAction(timeAction)
         

@@ -85,7 +85,7 @@ DEFAULT_TEMPLATE = """
     position: relative;
     width: fit-content;
     margin: 3px;
-    margin-top: 8px;
+    margin-top: 3px;
   }}
 
   .daily-challenge__name {{
@@ -117,7 +117,7 @@ DEFAULT_TEMPLATE = """
           <div>Challenge</div>
         </div>
         <div class="daily-challenge__value-box">
-          <div class="daily-challenge__value" title="Last updated: {current_time}&#13;User: {current_user}">298d</div>
+          <div class="daily-challenge__value" title="Last updated: {current_time}&#13;User: {current_user}">{daily_streak}</div>
         </div>
       </div>
     </div>
@@ -158,8 +158,7 @@ body {{
     --level-tier-lustrous: #ffe600,#ed82ff;
     font-family: var(--font-default-override,var(--font-default));
     margin: 0;
-    position: static;
-    overflow: hidden;
+    position: static
 }}
 
 .daily-challenge {{
@@ -168,12 +167,11 @@ body {{
     border-radius: 6px;
     display: flex;
     padding: 1px;
-    position: relative;
-    margin-top: 5px;
+    position: relative
 }}
 
 .daily-challenge--played-today {{
-    border-color: hsl(var(--hsl-lime-1));
+    border-color: hsl(var(--hsl-lime-1))
 }}
 
 .daily-challenge--played-today:before {{
@@ -192,29 +190,28 @@ body {{
     height: 16px;
     position: absolute;
     right: 0;
-    top: -2px;
+    top: 0;
     transform: translate(50%,-50%);
     width: 16px;
-    z-index: 2;
 }}
 
 .daily-challenge__name {{
     font-size: 12px;
     padding: 0 5px;
-    color: white;
+    color: white
 }}
 
 .daily-challenge__value {{
-    --colour: var(--level-tier-platinum);
+    --colour: hsl(var(--hsl-c2));
     -webkit-background-clip: text;
-    background-image: linear-gradient(45deg, var(--colour));
-    color: transparent;
+    background-image: linear-gradient(var(--colour));
+    color: transparent
 }}
 
 .daily-challenge__value-box {{
     background: hsl(var(--hsl-b6));
     border-radius: 3px;
-    padding: 5px 10px;
+    padding: 5px 10px
 }}
 
 .profile-detail {{
@@ -222,29 +219,11 @@ body {{
     background-color: transparent !important;
     display: grid;
     gap: 10px;
-    padding: 0;
-    width: 150px;
-    height: 57px;
-    position: relative;
-    z-index: 1;
+    padding: 10px var(--gutter)
 }}
 
 .profile-detail__values {{
     display: flex;
-    justify-content: center;
-    align-items: center;
-    width: 150px;
-    height: 57px;
-    overflow: hidden;
-}}
-
-.profile-detail__chart-numbers {{
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    width: 150px;
-    height: 57px;
-    overflow: hidden;
 }}
 
 body {{
@@ -324,7 +303,7 @@ body {{
 </head>
 <body class="t-section osu-layout osu-layout--body osu-layout--body-lazer js-animate-nav" style="--base-hue-default: 333; --base-hue-override: 333">
     <div class="profile-detail">
-          <div class="profile-detail__chart-numbers">
+          <div class="profile-detail__chart-numbers profile-detail__chart-numbers--top">
             <div class="profile-detail__values">
               <div class="daily-challenge daily-challenge--played-today" data-hasqtip="2" aria-describedby="qtip-2">
                 <div class="daily-challenge__name">
@@ -332,7 +311,7 @@ body {{
                   <div>Challenge</div>
                 </div>
                 <div class="daily-challenge__value-box">
-                  <div class="daily-challenge__value" style="--colour: var(--level-tier-platinum);" title="Last updated: {current_time}&#13;User: {current_user}">299d</div>
+                  <div class="daily-challenge__value" style="--colour: var(--level-tier-platinum);" title="Last updated: {current_time}&#13;User: {current_user}">{daily_streak}</div>
                 </div>
               </div>
             </div>
