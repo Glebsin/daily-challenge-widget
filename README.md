@@ -2,6 +2,11 @@ i don't know how to code
 
 98% github copilot + 1% chatgpt + 1% me
 
+how to use:
+
+launch widget.py or download executable in releases;
+context menu on right click to use settings (scaling, always on top toggle, view update statistic time and username, exit)
+
 functions:
 
 0. (statistic update time placeholder, user nickname placeholder)
