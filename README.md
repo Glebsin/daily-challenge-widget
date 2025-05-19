@@ -21,3 +21,4 @@ functions:
 todo:
 1. statistic update
 2. autostart with system
+3. theme customizing
