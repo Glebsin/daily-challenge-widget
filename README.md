@@ -1,7 +1,9 @@
 i don't know how to code
+
 98% github copilot + 1% chatgpt + 1% me
 
 functions:
+
 0. (statistic update time placeholder, user nickname placeholder)
 1. scaling from 100 to 500%
 2. scale and position save
