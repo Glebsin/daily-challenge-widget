@@ -13,10 +13,20 @@ from widget_templates import DEFAULT_TEMPLATE, ALTERNATIVE_TEMPLATE
 class NonClosingMenu(QMenu):
     def mouseReleaseEvent(self, e):
         action = self.activeAction()
-        if action and action.isEnabled():
+        if action and isinstance(action, QWidgetAction):
+            # Для QWidgetAction (поле Scale) игнорируем событие
+            e.ignore()
+        elif action and action.isEnabled():
             action.trigger()
         else:
             e.ignore()
+            
+    def keyPressEvent(self, e):
+        # Предотвращаем закрытие меню при нажатии Enter
+        if e.key() == Qt.Key_Return or e.key() == Qt.Key_Enter:
+            e.ignore()
+        else:
+            super().keyPressEvent(e)
 
 class TransparentWindow(QMainWindow):
     def __init__(self):
@@ -32,6 +42,10 @@ class TransparentWindow(QMainWindow):
         self.key_sequence = []
         self.use_alternative_template = self.settings.get('use_alternative_template', False)
         self.animation = None
+        
+        # Настройки для примагничивания и перемещения стрелками
+        self.snap_distance = 10  # Расстояние притягивания в пикселях
+        self.arrow_step = 2      # Шаг перемещения стрелками в пикселях
         
         self.initUI()
         self.oldPos = self.pos()
@@ -99,7 +113,7 @@ class TransparentWindow(QMainWindow):
         
         current_template = ALTERNATIVE_TEMPLATE if self.use_alternative_template else DEFAULT_TEMPLATE
         html_content = current_template.format(
-            current_time="2025-05-19 12:45:16",
+            current_time="2025-05-19 13:51:47",
             current_user="Glebsin"
         )
         
@@ -196,7 +210,7 @@ class TransparentWindow(QMainWindow):
         
         current_template = ALTERNATIVE_TEMPLATE if self.use_alternative_template else DEFAULT_TEMPLATE
         html_content = current_template.format(
-            current_time="2025-05-19 12:45:16",
+            current_time="2025-05-19 13:51:47",
             current_user="Glebsin"
         )
         
@@ -212,8 +226,8 @@ class TransparentWindow(QMainWindow):
         self.save_settings()
 
     def keyPressEvent(self, event):
+        # Сохраняем существующую обработку комбинации клавиш
         self.key_sequence.append(event.key())
-        
         if len(self.key_sequence) > 3:
             self.key_sequence = self.key_sequence[-3:]
         
@@ -223,6 +237,20 @@ class TransparentWindow(QMainWindow):
                 print(f"Debug border toggled: {'ON' if self.debug_border else 'OFF'}")
             self.key_sequence = []
 
+        # Обработка стрелок без ограничений
+        if event.key() == Qt.Key_Left:
+            self.move(self.x() - self.arrow_step, self.y())
+            self.save_settings()
+        elif event.key() == Qt.Key_Right:
+            self.move(self.x() + self.arrow_step, self.y())
+            self.save_settings()
+        elif event.key() == Qt.Key_Up:
+            self.move(self.x(), self.y() - self.arrow_step)
+            self.save_settings()
+        elif event.key() == Qt.Key_Down:
+            self.move(self.x(), self.y() + self.arrow_step)
+            self.save_settings()
+
     def mousePressEvent(self, event):
         if event.button() == Qt.RightButton:
             self.createContextMenu()
@@ -231,7 +259,37 @@ class TransparentWindow(QMainWindow):
 
     def mouseMoveEvent(self, event):
         delta = QPoint(event.globalPos() - self.oldPos)
-        self.move(self.x() + delta.x(), self.y() + delta.y())
+        new_pos = QPoint(self.x() + delta.x(), self.y() + delta.y())
+        
+        # Получаем все экраны
+        screens = QApplication.screens()
+        current_screen = None
+        
+        # Определяем, на каком экране находится курсор
+        for screen in screens:
+            if screen.geometry().contains(event.globalPos()):
+                current_screen = screen
+                break
+        
+        if not current_screen:
+            current_screen = QApplication.primaryScreen()
+        
+        # Проверяем близость к краям экрана только если двигаемся медленно
+        if abs(delta.x()) < 5 and abs(delta.y()) < 5:  # Уменьшаем порог для медленного движения
+            screen_geo = current_screen.geometry()
+            
+            # Проверяем близость к краям экрана с учетом геометрии текущего экрана
+            if abs(new_pos.x() - screen_geo.x()) < self.snap_distance:  # Левый край
+                new_pos.setX(screen_geo.x())
+            elif abs((screen_geo.x() + screen_geo.width()) - (new_pos.x() + self.width())) < self.snap_distance:  # Правый край
+                new_pos.setX(screen_geo.x() + screen_geo.width() - self.width())
+                
+            if abs(new_pos.y() - screen_geo.y()) < self.snap_distance:  # Верхний край
+                new_pos.setY(screen_geo.y())
+            elif abs((screen_geo.y() + screen_geo.height()) - (new_pos.y() + self.height())) < self.snap_distance:  # Нижний край
+                new_pos.setY(screen_geo.y() + screen_geo.height() - self.height())
+        
+        self.move(new_pos)
         self.oldPos = event.globalPos()
         self.save_settings()
 
@@ -266,15 +324,27 @@ class TransparentWindow(QMainWindow):
         def updateScale():
             try:
                 value = int(scaleInput.text())
-                if 100 <= value <= 500:
-                    self.setScale(value)
-                else:
-                    scaleInput.setText(str(self.scale))
+                if value > 500:
+                    value = 500
+                    scaleInput.setText(str(value))
+                if value < 100:
+                    value = 100
+                    scaleInput.setText(str(value))
+                self.setScale(value)
+                self.save_settings()
             except ValueError:
                 scaleInput.setText(str(self.scale))
+            finally:
+                # Устанавливаем фокус обратно на поле ввода и выделяем текст
+                scaleInput.setFocus()
+                scaleInput.selectAll()
+        
+        # Изменяем обработку события returnPressed
+        def handleReturnPressed():
+            updateScale()
         
         # Подключаем сигнал
-        scaleInput.returnPressed.connect(updateScale)
+        scaleInput.returnPressed.connect(handleReturnPressed)
         
         # Добавляем виджеты в layout
         scaleLayout.addWidget(scaleLabel)
@@ -295,7 +365,7 @@ class TransparentWindow(QMainWindow):
         
         menu.addSeparator()
         
-        timeAction = QAction('Updated: 2025-05-19 12:45:16', self)
+        timeAction = QAction('Updated: 2025-05-19 13:51:47', self)
         timeAction.setEnabled(False)
         menu.addAction(timeAction)
         
@@ -348,6 +418,10 @@ class TransparentWindow(QMainWindow):
             pos.setX(pos.x() - menu_size.width())
         
         menu.exec_(pos)
+        
+        # Устанавливаем фокус на поле ввода при открытии меню
+        scaleInput.setFocus()
+        scaleInput.selectAll()
 
     def closeApp(self):
         self.save_settings()
