@@ -2,7 +2,7 @@ i don't know how to code
 
 98% github copilot + 1% chatgpt + 1% me
 
-HOW TO USE:
+**HOW TO USE:**
 
 launch widget.py or download executable in releases;
 
@@ -22,3 +22,5 @@ functions:
 todo:
 1. autostart with system
 2. theme customizing
+
+<sub>727</sub>
