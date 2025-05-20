@@ -1,6 +1,7 @@
 import sys
 import json
 import os
+import winreg
 from datetime import datetime, timezone, timedelta
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QMenu, QAction, 
                            QWidgetAction, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
@@ -10,6 +11,75 @@ from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineSettings, QWebEng
 from PyQt5.QtGui import QCursor
 from widget_templates import DEFAULT_TEMPLATE, ALTERNATIVE_TEMPLATE
 from ossapi import Ossapi
+
+def add_to_startup_registry():
+    """Добавляет приложение в автозапуск через реестр Windows"""
+    try:
+        if getattr(sys, 'frozen', False):
+            app_path = sys.executable
+        else:
+            return False
+
+        key = winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            r"Software\Microsoft\Windows\CurrentVersion\Run",
+            0,
+            winreg.KEY_SET_VALUE
+        )
+
+        winreg.SetValueEx(
+            key,
+            "DailyWidget",
+            0,
+            winreg.REG_SZ,
+            f'"{app_path}"'
+        )
+        
+        winreg.CloseKey(key)
+        return True
+    except Exception as e:
+        print(f"Error adding to startup: {e}")
+        return False
+
+def remove_from_startup_registry():
+    """Удаляет приложение из автозапуска в реестре Windows"""
+    try:
+        key = winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            r"Software\Microsoft\Windows\CurrentVersion\Run",
+            0,
+            winreg.KEY_SET_VALUE
+        )
+
+        try:
+            winreg.DeleteValue(key, "DailyWidget")
+        except:
+            pass
+        
+        winreg.CloseKey(key)
+        return True
+    except Exception as e:
+        print(f"Error removing from startup: {e}")
+        return False
+
+def is_in_startup_registry():
+    """Проверяет, добавлено ли приложение в автозапуск через реестр"""
+    try:
+        key = winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            r"Software\Microsoft\Windows\CurrentVersion\Run",
+            0,
+            winreg.KEY_READ
+        )
+        try:
+            value, _ = winreg.QueryValueEx(key, "DailyWidget")
+            winreg.CloseKey(key)
+            return True
+        except:
+            winreg.CloseKey(key)
+            return False
+    except:
+        return False
 
 class NonClosingMenu(QMenu):
     def mouseReleaseEvent(self, e):
@@ -48,6 +118,11 @@ class TransparentWindow(QMainWindow):
         self.use_alternative_template = self.settings.get('use_alternative_template', False)
         self.always_on_top = self.settings.get('always_on_top', True)
         self.enable_logging = False if getattr(sys, 'frozen', False) else self.settings.get('enable_logging', False)
+        
+        # Добавляем автозапуск при первом запуске exe
+        if getattr(sys, 'frozen', False) and self.settings.get('autostart', True):
+            add_to_startup_registry()
+            
         self.animation = None
         
         self.snap_distance = 10
@@ -94,7 +169,6 @@ class TransparentWindow(QMainWindow):
 
     def get_daily_streak(self):
         try:
-            # Проверяем все поля перед запросом к API
             if not self.osu_client_id or not self.osu_client_secret or not self.osu_username:
                 if self.enable_logging:
                     print("[osu!api] Skipping API request - missing credentials:")
@@ -116,16 +190,12 @@ class TransparentWindow(QMainWindow):
                 if self.enable_logging:
                     print(f"[osu!api] Received streak value: {streak_value}")
                 
-                # Расчет дней с начальной даты
                 days_since_start = self.calculate_days_since_start()
-                
-                # Определение разницы
                 streak_difference = days_since_start - streak_value
                 
                 if self.enable_logging:
                     print(f"[Widget] Streak difference: {streak_difference}")
                 
-                # Выбор шаблона на основе разницы
                 if streak_difference == 0:
                     self.use_alternative_template = True
                     if self.enable_logging:
@@ -149,7 +219,6 @@ class TransparentWindow(QMainWindow):
         if self.enable_logging:
             print("[Widget] Updating streak value...")
             
-        # Проверяем все поля перед обновлением
         if not self.osu_client_id or not self.osu_client_secret or not self.osu_username:
             if self.enable_logging:
                 print("[Widget] Skipping streak update - missing credentials")
@@ -165,7 +234,7 @@ class TransparentWindow(QMainWindow):
             
         current_template = ALTERNATIVE_TEMPLATE if self.use_alternative_template else DEFAULT_TEMPLATE
         html_content = current_template.format(
-            current_time="2025-05-20 09:37:25",
+            current_time="2025-05-20 10:20:44",
             current_user="Glebsin",
             daily_streak=streak_value
         )
@@ -206,7 +275,8 @@ class TransparentWindow(QMainWindow):
                 'enable_logging': self.enable_logging if not getattr(sys, 'frozen', False) else False,
                 'osu_client_id': self.osu_client_id,
                 'osu_client_secret': self.osu_client_secret,
-                'osu_username': self.osu_username
+                'osu_username': self.osu_username,
+                'autostart': is_in_startup_registry() if getattr(sys, 'frozen', False) else False
             }
             
             temp_file = self.settings_file + '.tmp'
@@ -289,6 +359,18 @@ class TransparentWindow(QMainWindow):
         self.move(current_pos)
         self.save_settings()
 
+    def toggle_autostart(self):
+        if is_in_startup_registry():
+            success = remove_from_startup_registry()
+            if success:
+                self.settings['autostart'] = False
+                self.save_settings()
+        else:
+            success = add_to_startup_registry()
+            if success:
+                self.settings['autostart'] = True
+                self.save_settings()
+
     def toggle_logging(self):
         if not getattr(sys, 'frozen', False):
             self.enable_logging = not self.enable_logging
@@ -353,7 +435,7 @@ class TransparentWindow(QMainWindow):
         
         current_template = ALTERNATIVE_TEMPLATE if self.use_alternative_template else DEFAULT_TEMPLATE
         html_content = current_template.format(
-            current_time="2025-05-20 09:37:25",
+            current_time="2025-05-20 10:20:44",
             current_user="Glebsin",
             daily_streak="0d"
         ).replace('</style>', additional_style + '</style>')
@@ -368,7 +450,6 @@ class TransparentWindow(QMainWindow):
         self.webView.show()
         self.show()
         
-        # Запускаем обновление стрика после отображения виджета
         QTimer.singleShot(100, self.update_streak)
 
     def updateSize(self):
@@ -471,7 +552,7 @@ class TransparentWindow(QMainWindow):
         current_template = ALTERNATIVE_TEMPLATE if self.use_alternative_template else DEFAULT_TEMPLATE
         streak_value = self.get_daily_streak()
         html_content = current_template.format(
-            current_time="2025-05-20 09:37:25",
+            current_time="2025-05-20 10:20:44",
             current_user="Glebsin",
             daily_streak=streak_value
         ).replace('</style>', additional_style + '</style>')
@@ -702,6 +783,7 @@ class TransparentWindow(QMainWindow):
         osuLayout.addWidget(usernameLabel)
         osuLayout.addWidget(usernameInput)
         
+        osuWidget.setLayout(osuLayout)
         osuAction = QWidgetAction(menu)
         osuAction.setDefaultWidget(osuWidget)
         menu.addAction(osuAction)
@@ -714,6 +796,14 @@ class TransparentWindow(QMainWindow):
         alwaysOnTopAction.triggered.connect(self.toggle_always_on_top)
         menu.addAction(alwaysOnTopAction)
         
+        # Добавляем опцию автозапуска только для exe версии
+        if getattr(sys, 'frozen', False):
+            autostartAction = QAction('Run at Startup', self)
+            autostartAction.setCheckable(True)
+            autostartAction.setChecked(is_in_startup_registry())
+            autostartAction.triggered.connect(self.toggle_autostart)
+            menu.addAction(autostartAction)
+        
         # Показываем опцию логирования только если не exe
         if not getattr(sys, 'frozen', False):
             loggingAction = QAction('Enable API Logging', self)
@@ -724,7 +814,7 @@ class TransparentWindow(QMainWindow):
         
         menu.addSeparator()
         
-        timeAction = QAction('Updated: 2025-05-20 09:37:25', self)
+        timeAction = QAction('Updated: 2025-05-20 10:25:00', self)
         timeAction.setEnabled(False)
         menu.addAction(timeAction)
         
