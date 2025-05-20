@@ -22,14 +22,13 @@ Functions:
 4. always on top switch
 5. precise movement of the widget by arrows
 6. autostart
-7. statistic update time
 
 Todo:
 1. theme customizing
 2. make text in fields save when focus is out
 3. turn on complete (alternative) template by checking "daily_streak_best" and not by "daily_streak_current" (so that you can track your daily challenge completion)
 4. give the ability to switch the number of days to best streak or current streak
-5. correctly display update time hours by system clock
+5. correctly display update widget time (now it show date of open context menu lol)
 6. make a setting to change widget refresh time (now it updating once in 5min)
 7. make right colors for all number of days
 
