@@ -94,9 +94,22 @@ class TransparentWindow(QMainWindow):
 
     def get_daily_streak(self):
         try:
-            if self.osu_client_id and self.osu_client_secret and self.osu_username:
+            # Проверяем все поля перед запросом к API
+            if not self.osu_client_id or not self.osu_client_secret or not self.osu_username:
                 if self.enable_logging:
-                    print(f"[osu!api] Sending request for user {self.osu_username}")
+                    print("[osu!api] Skipping API request - missing credentials:")
+                    if not self.osu_client_id:
+                        print("[osu!api] - Client ID is empty")
+                    if not self.osu_client_secret:
+                        print("[osu!api] - Client Secret is empty")
+                    if not self.osu_username:
+                        print("[osu!api] - Username is empty")
+                return '0d'
+                
+            if self.enable_logging:
+                print(f"[osu!api] All credentials present, sending request for user {self.osu_username}")
+            
+            try:
                 api = Ossapi(self.osu_client_id, self.osu_client_secret)
                 user = api.user(self.osu_username)
                 streak_value = user.daily_challenge_user_stats.daily_streak_current
@@ -123,9 +136,10 @@ class TransparentWindow(QMainWindow):
                         print("[Widget] Using DEFAULT_TEMPLATE (streak is behind by 1 day)")
                 
                 return f"{streak_value}d"
-            if self.enable_logging:
-                print("[osu!api] Missing API credentials or username")
-            return '0d'
+            except Exception as api_error:
+                if self.enable_logging:
+                    print(f"[osu!api] API request error: {api_error}")
+                return '0d'
         except Exception as e:
             if self.enable_logging:
                 print(f"[osu!api] Error getting daily streak: {e}")
@@ -134,16 +148,31 @@ class TransparentWindow(QMainWindow):
     def update_streak(self):
         if self.enable_logging:
             print("[Widget] Updating streak value...")
-        streak_value = self.get_daily_streak()
+            
+        # Проверяем все поля перед обновлением
+        if not self.osu_client_id or not self.osu_client_secret or not self.osu_username:
+            if self.enable_logging:
+                print("[Widget] Skipping streak update - missing credentials")
+                if not self.osu_client_id:
+                    print("[Widget] - Client ID is empty")
+                if not self.osu_client_secret:
+                    print("[Widget] - Client Secret is empty")
+                if not self.osu_username:
+                    print("[Widget] - Username is empty")
+            streak_value = "0d"
+        else:
+            streak_value = self.get_daily_streak()
+            
         current_template = ALTERNATIVE_TEMPLATE if self.use_alternative_template else DEFAULT_TEMPLATE
         html_content = current_template.format(
-            current_time="2025-05-20 00:26:41",
+            current_time="2025-05-20 09:06:44",
             current_user="Glebsin",
             daily_streak=streak_value
         )
-        self.webView.setHtml(html_content)
-        if self.enable_logging:
-            print("[Widget] Streak value updated")
+        if hasattr(self, 'webView'):
+            self.webView.setHtml(html_content)
+            if self.enable_logging:
+                print(f"[Widget] Streak value updated: {streak_value}")
 
     def load_settings(self):
         if os.path.exists(self.settings_file):
@@ -205,22 +234,59 @@ class TransparentWindow(QMainWindow):
                 print(f"Fatal error saving settings: {e}")
 
     def update_osu_settings(self, client_id=None, client_secret=None, username=None):
+        settings_changed = False
+        
         if client_id is not None:
-            self.osu_client_id = client_id
+            if not self.osu_client_secret or not self.osu_username:
+                if self.enable_logging:
+                    print("[osu!api] Missing client secret or username, skipping API request")
+                self.osu_client_id = client_id
+                settings_changed = True
+            else:
+                self.osu_client_id = client_id
+                settings_changed = True
+                if self.enable_logging:
+                    print("[osu!api] Client ID updated, all fields present")
+                self.update_streak()
+                
         if client_secret is not None:
-            self.osu_client_secret = client_secret
+            if not self.osu_client_id or not self.osu_username:
+                if self.enable_logging:
+                    print("[osu!api] Missing client ID or username, skipping API request")
+                self.osu_client_secret = client_secret
+                settings_changed = True
+            else:
+                self.osu_client_secret = client_secret
+                settings_changed = True
+                if self.enable_logging:
+                    print("[osu!api] Client Secret updated, all fields present")
+                self.update_streak()
+                
         if username is not None:
-            self.osu_username = username
-        self.save_settings()
+            if not self.osu_client_id or not self.osu_client_secret:
+                if self.enable_logging:
+                    print("[osu!api] Missing client ID or client secret, skipping API request")
+                self.osu_username = username
+                settings_changed = True
+            else:
+                self.osu_username = username
+                settings_changed = True
+                if self.enable_logging:
+                    print("[osu!api] Username updated, all fields present")
+                self.update_streak()
+
+        if settings_changed:
+            self.save_settings()
 
     def toggle_always_on_top(self):
         self.always_on_top = not self.always_on_top
-        flags = self.windowFlags()
+        flags = Qt.FramelessWindowHint | Qt.Tool
         if self.always_on_top:
-            self.setWindowFlags(flags | Qt.WindowStaysOnTopHint)
-        else:
-            self.setWindowFlags(flags & ~Qt.WindowStaysOnTopHint)
+            flags |= Qt.WindowStaysOnTopHint
+        self.setWindowFlags(flags)
+        current_pos = self.pos()
         self.show()
+        self.move(current_pos)
         self.save_settings()
 
     def toggle_logging(self):
@@ -234,7 +300,7 @@ class TransparentWindow(QMainWindow):
 
     def initUI(self):
         self.updateWindowStyle()
-            
+        
         flags = Qt.FramelessWindowHint | Qt.Tool
         if self.always_on_top:
             flags |= Qt.WindowStaysOnTopHint
@@ -285,11 +351,10 @@ class TransparentWindow(QMainWindow):
         """
         
         current_template = ALTERNATIVE_TEMPLATE if self.use_alternative_template else DEFAULT_TEMPLATE
-        streak_value = self.get_daily_streak()
         html_content = current_template.format(
-            current_time="2025-05-20 00:26:41",
+            current_time="2025-05-20 09:06:44",
             current_user="Glebsin",
-            daily_streak=streak_value
+            daily_streak="0d"
         ).replace('</style>', additional_style + '</style>')
         
         self.webView.page().setBackgroundColor(Qt.transparent)
@@ -299,7 +364,11 @@ class TransparentWindow(QMainWindow):
         if self.scale != 100:
             self.webView.setZoomFactor(self.scale / 100)
             
+        self.webView.show()
         self.show()
+        
+        # Запускаем обновление стрика после отображения виджета
+        QTimer.singleShot(100, self.update_streak)
 
     def updateSize(self):
         if hasattr(self, 'animation') and self.animation and self.animation.state() == QPropertyAnimation.Running:
@@ -401,7 +470,7 @@ class TransparentWindow(QMainWindow):
         current_template = ALTERNATIVE_TEMPLATE if self.use_alternative_template else DEFAULT_TEMPLATE
         streak_value = self.get_daily_streak()
         html_content = current_template.format(
-            current_time="2025-05-20 00:26:41",
+            current_time="2025-05-20 09:06:44",
             current_user="Glebsin",
             daily_streak=streak_value
         ).replace('</style>', additional_style + '</style>')
@@ -621,7 +690,6 @@ class TransparentWindow(QMainWindow):
                 clientSecretInput.text(),
                 usernameInput.text()
             )
-            self.update_streak()  # Обновляем значение стрика после изменения настроек
         
         for input_field in [clientIdInput, clientSecretInput, usernameInput]:
             input_field.returnPressed.connect(updateOsuSettings)
@@ -653,7 +721,7 @@ class TransparentWindow(QMainWindow):
         
         menu.addSeparator()
         
-        timeAction = QAction('Updated: 2025-05-20 08:30:30', self)
+        timeAction = QAction('Updated: 2025-05-20 09:06:44', self)
         timeAction.setEnabled(False)
         menu.addAction(timeAction)
         
