@@ -253,8 +253,8 @@ class TransparentWindow(QMainWindow):
         # Make sure to use the current template state that was set in get_daily_streak()
         current_template = ALTERNATIVE_TEMPLATE if self.use_alternative_template else DEFAULT_TEMPLATE
         html_content = current_template.format(
-            current_time="2025-05-20 14:07:10",
-            current_user="Glebsin",
+            current_time="2025-05-20 15:58:38",
+            current_user="rvany345",
             daily_streak=streak_value
         )
         if hasattr(self, 'webView'):
@@ -465,8 +465,8 @@ class TransparentWindow(QMainWindow):
         
         current_template = ALTERNATIVE_TEMPLATE if self.use_alternative_template else DEFAULT_TEMPLATE
         html_content = current_template.format(
-            current_time="2025-05-20 14:07:10",
-            current_user="Glebsin",
+            current_time="2025-05-20 15:58:38",
+            current_user="rvany345",
             daily_streak="0d"
         ).replace('</style>', additional_style + '</style>')
         
@@ -623,8 +623,8 @@ class TransparentWindow(QMainWindow):
         current_template = ALTERNATIVE_TEMPLATE if self.use_alternative_template else DEFAULT_TEMPLATE
         streak_value = self.get_daily_streak()
         html_content = current_template.format(
-            current_time="2025-05-20 14:07:10",
-            current_user="Glebsin",
+            current_time="2025-05-20 15:58:38",
+            current_user="rvany345",
             daily_streak=streak_value
         ).replace('</style>', additional_style + '</style>')
         
@@ -795,13 +795,11 @@ class TransparentWindow(QMainWindow):
         
         menu.addSeparator()
         
-        timeAction = QAction(f'Updated: 2025-05-20 14:11:16', self)
+        # Get current UTC time
+        current_time = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+        timeAction = QAction(f'Updated: {current_time}', self)
         timeAction.setEnabled(False)
         menu.addAction(timeAction)
-        
-        userAction = QAction(f'User: Glebsin', self)
-        userAction.setEnabled(False)
-        menu.addAction(userAction)
         
         menu.addSeparator()
         exitAction = menu.addAction('Exit')
