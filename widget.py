@@ -196,12 +196,14 @@ class TransparentWindow(QMainWindow):
         if self.enable_logging:
             print(f"[Widget] Days since start (2024-07-24): {days}")
         return days
+
     def get_daily_streak(self):
         """Get current streak from osu!api"""
         try:
             if not self.osu_client_id or not self.osu_client_secret or not self.osu_username:
                 if self.enable_logging:
                     print("[osu!api] Skipping API request - missing credentials")
+                self.use_alternative_template = False  # Reset to default template when no credentials
                 return '0d'
                 
             if self.enable_logging:
@@ -220,23 +222,26 @@ class TransparentWindow(QMainWindow):
                 if self.enable_logging:
                     print(f"[Widget] Streak difference: {streak_difference}")
                 
+                # Always update template based on current streak difference
                 if streak_difference == 0:
+                    if self.enable_logging:
+                        print("[Widget] Setting ALTERNATIVE_TEMPLATE (streak is current)")
                     self.use_alternative_template = True
+                else:
                     if self.enable_logging:
-                        print("[Widget] Using ALTERNATIVE_TEMPLATE (streak is current)")
-                elif streak_difference == 1:
+                        print("[Widget] Setting DEFAULT_TEMPLATE (streak is behind)")
                     self.use_alternative_template = False
-                    if self.enable_logging:
-                        print("[Widget] Using DEFAULT_TEMPLATE (streak is behind by 1 day)")
                 
                 return f"{streak_value}d"
             except Exception as api_error:
                 if self.enable_logging:
                     print(f"[osu!api] API request error: {api_error}")
+                self.use_alternative_template = False  # Reset to default template on error
                 return '0d'
         except Exception as e:
             if self.enable_logging:
                 print(f"[osu!api] Error getting daily streak: {e}")
+            self.use_alternative_template = False  # Reset to default template on error
             return '0d'
 
     def update_streak(self):
@@ -245,9 +250,10 @@ class TransparentWindow(QMainWindow):
             print("[Widget] Updating streak value...")
             
         streak_value = self.get_daily_streak()
+        # Make sure to use the current template state that was set in get_daily_streak()
         current_template = ALTERNATIVE_TEMPLATE if self.use_alternative_template else DEFAULT_TEMPLATE
         html_content = current_template.format(
-            current_time="2025-05-20 13:22:23",
+            current_time="2025-05-20 14:07:10",
             current_user="Glebsin",
             daily_streak=streak_value
         )
@@ -255,6 +261,7 @@ class TransparentWindow(QMainWindow):
             self.webView.setHtml(html_content)
             if self.enable_logging:
                 print(f"[Widget] Streak value updated: {streak_value}")
+                print(f"[Widget] Using {'ALTERNATIVE' if self.use_alternative_template else 'DEFAULT'} template")
 
     def load_settings(self):
         """Load settings from file with validation"""
@@ -458,7 +465,7 @@ class TransparentWindow(QMainWindow):
         
         current_template = ALTERNATIVE_TEMPLATE if self.use_alternative_template else DEFAULT_TEMPLATE
         html_content = current_template.format(
-            current_time="2025-05-20 13:22:23",
+            current_time="2025-05-20 14:07:10",
             current_user="Glebsin",
             daily_streak="0d"
         ).replace('</style>', additional_style + '</style>')
@@ -616,7 +623,7 @@ class TransparentWindow(QMainWindow):
         current_template = ALTERNATIVE_TEMPLATE if self.use_alternative_template else DEFAULT_TEMPLATE
         streak_value = self.get_daily_streak()
         html_content = current_template.format(
-            current_time="2025-05-20 13:22:23",
+            current_time="2025-05-20 14:07:10",
             current_user="Glebsin",
             daily_streak=streak_value
         ).replace('</style>', additional_style + '</style>')
@@ -631,94 +638,6 @@ class TransparentWindow(QMainWindow):
         self.webView.show()
         self.move(current_pos)
         self.save_settings()
-
-    def keyPressEvent(self, event):
-        """Handle key press events"""
-        if event.key() == Qt.Key_F4 and event.modifiers() == Qt.AltModifier:
-            self.closeApp()
-            return
-            
-        if event.key() == Qt.Key_A and event.modifiers() == Qt.ControlModifier:
-            event.ignore()
-            return
-            
-        self.key_sequence.append(event.key())
-        if len(self.key_sequence) > 3:
-            self.key_sequence = self.key_sequence[-3:]
-        
-        if len(self.key_sequence) == 3:
-            if self.key_sequence == [Qt.Key_7, Qt.Key_2, Qt.Key_7]:
-                self.toggleDebugBorder()
-                print(f"Debug border {'enabled' if self.debug_border else 'disabled'}")
-            self.key_sequence = []
-
-        moved = False
-        if event.key() == Qt.Key_Left:
-            self.move(self.x() - self.arrow_step, self.y())
-            moved = True
-        elif event.key() == Qt.Key_Right:
-            self.move(self.x() + self.arrow_step, self.y())
-            moved = True
-        elif event.key() == Qt.Key_Up:
-            self.move(self.x(), self.y() - self.arrow_step)
-            moved = True
-        elif event.key() == Qt.Key_Down:
-            self.move(self.x(), self.y() + self.arrow_step)
-            moved = True
-
-        if moved:
-            QApplication.processEvents()
-            self.settings['position'] = {
-                'x': int(self.geometry().x()),
-                'y': int(self.geometry().y())
-            }
-            self.save_settings()
-
-    def mousePressEvent(self, event):
-        """Handle mouse press events"""
-        if event.button() == Qt.RightButton:
-            self.createContextMenu()
-        else:
-            self.oldPos = event.globalPos()
-
-    def mouseMoveEvent(self, event):
-        """Handle mouse move events"""
-        delta = QPoint(event.globalPos() - self.oldPos)
-        new_pos = QPoint(self.x() + delta.x(), self.y() + delta.y())
-        
-        screens = QApplication.screens()
-        current_screen = None
-        
-        for screen in screens:
-            if screen.geometry().contains(event.globalPos()):
-                current_screen = screen
-                break
-        
-        if not current_screen:
-            current_screen = QApplication.primaryScreen()
-        
-        if abs(delta.x()) < 5 and abs(delta.y()) < 5:
-            screen_geo = current_screen.geometry()
-            
-            if abs(new_pos.x() - screen_geo.x()) < self.snap_distance:
-                new_pos.setX(screen_geo.x())
-            elif abs((screen_geo.x() + screen_geo.width()) - (new_pos.x() + self.width())) < self.snap_distance:
-                new_pos.setX(screen_geo.x() + screen_geo.width() - self.width())
-                
-            if abs(new_pos.y() - screen_geo.y()) < self.snap_distance:
-                new_pos.setY(screen_geo.y())
-            elif abs((screen_geo.y() + screen_geo.height()) - (new_pos.y() + self.height())) < self.snap_distance:
-                new_pos.setY(screen_geo.y() + screen_geo.height() - self.height())
-        
-        self.move(new_pos)
-        self.oldPos = event.globalPos()
-        
-        if abs(delta.x()) < 5 and abs(delta.y()) < 5:
-            self.settings['position'] = {
-                'x': int(self.geometry().x()),
-                'y': int(self.geometry().y())
-            }
-            self.save_settings()
 
     def createContextMenu(self):
         """Create and show context menu"""
@@ -876,7 +795,7 @@ class TransparentWindow(QMainWindow):
         
         menu.addSeparator()
         
-        timeAction = QAction(f'Updated: 2025-05-20 13:22:23', self)
+        timeAction = QAction(f'Updated: 2025-05-20 14:11:16', self)
         timeAction.setEnabled(False)
         menu.addAction(timeAction)
         
@@ -960,6 +879,94 @@ class TransparentWindow(QMainWindow):
         except SystemExit:
             QApplication.instance().quit()
         event.accept()
+
+    def keyPressEvent(self, event):
+        """Handle key press events"""
+        if event.key() == Qt.Key_F4 and event.modifiers() == Qt.AltModifier:
+            self.closeApp()
+            return
+            
+        if event.key() == Qt.Key_A and event.modifiers() == Qt.ControlModifier:
+            event.ignore()
+            return
+            
+        self.key_sequence.append(event.key())
+        if len(self.key_sequence) > 3:
+            self.key_sequence = self.key_sequence[-3:]
+        
+        if len(self.key_sequence) == 3:
+            if self.key_sequence == [Qt.Key_7, Qt.Key_2, Qt.Key_7]:
+                self.toggleDebugBorder()
+                print(f"Debug border {'enabled' if self.debug_border else 'disabled'}")
+            self.key_sequence = []
+
+        moved = False
+        if event.key() == Qt.Key_Left:
+            self.move(self.x() - self.arrow_step, self.y())
+            moved = True
+        elif event.key() == Qt.Key_Right:
+            self.move(self.x() + self.arrow_step, self.y())
+            moved = True
+        elif event.key() == Qt.Key_Up:
+            self.move(self.x(), self.y() - self.arrow_step)
+            moved = True
+        elif event.key() == Qt.Key_Down:
+            self.move(self.x(), self.y() + self.arrow_step)
+            moved = True
+
+        if moved:
+            QApplication.processEvents()
+            self.settings['position'] = {
+                'x': int(self.geometry().x()),
+                'y': int(self.geometry().y())
+            }
+            self.save_settings()
+
+    def mousePressEvent(self, event):
+        """Handle mouse press events"""
+        if event.button() == Qt.RightButton:
+            self.createContextMenu()
+        else:
+            self.oldPos = event.globalPos()
+
+    def mouseMoveEvent(self, event):
+        """Handle mouse move events"""
+        delta = QPoint(event.globalPos() - self.oldPos)
+        new_pos = QPoint(self.x() + delta.x(), self.y() + delta.y())
+        
+        screens = QApplication.screens()
+        current_screen = None
+        
+        for screen in screens:
+            if screen.geometry().contains(event.globalPos()):
+                current_screen = screen
+                break
+        
+        if not current_screen:
+            current_screen = QApplication.primaryScreen()
+        
+        if abs(delta.x()) < 5 and abs(delta.y()) < 5:
+            screen_geo = current_screen.geometry()
+            
+            if abs(new_pos.x() - screen_geo.x()) < self.snap_distance:
+                new_pos.setX(screen_geo.x())
+            elif abs((screen_geo.x() + screen_geo.width()) - (new_pos.x() + self.width())) < self.snap_distance:
+                new_pos.setX(screen_geo.x() + screen_geo.width() - self.width())
+                
+            if abs(new_pos.y() - screen_geo.y()) < self.snap_distance:
+                new_pos.setY(screen_geo.y())
+            elif abs((screen_geo.y() + screen_geo.height()) - (new_pos.y() + self.height())) < self.snap_distance:
+                new_pos.setY(screen_geo.y() + screen_geo.height() - self.height())
+        
+        self.move(new_pos)
+        self.oldPos = event.globalPos()
+        
+        if abs(delta.x()) < 5 and abs(delta.y()) < 5:
+            self.settings['position'] = {
+                'x': int(self.geometry().x()),
+                'y': int(self.geometry().y())
+            }
+            self.save_settings()
 
 if __name__ == '__main__':
     # Disable logging and GPU for QtWebEngine
