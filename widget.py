@@ -13,7 +13,7 @@ from widget_templates import DEFAULT_TEMPLATE, ALTERNATIVE_TEMPLATE
 from ossapi import Ossapi
 
 def add_to_startup_registry():
-    """Добавляет приложение в автозапуск через реестр Windows"""
+    """Add application to Windows startup registry"""
     try:
         if getattr(sys, 'frozen', False):
             app_path = sys.executable
@@ -42,7 +42,7 @@ def add_to_startup_registry():
         return False
 
 def remove_from_startup_registry():
-    """Удаляет приложение из автозапуска в реестре Windows"""
+    """Remove application from Windows startup registry"""
     try:
         key = winreg.OpenKey(
             winreg.HKEY_CURRENT_USER,
@@ -63,7 +63,7 @@ def remove_from_startup_registry():
         return False
 
 def is_in_startup_registry():
-    """Проверяет, добавлено ли приложение в автозапуск через реестр"""
+    """Check if application is in Windows startup registry"""
     try:
         key = winreg.OpenKey(
             winreg.HKEY_CURRENT_USER,
@@ -82,6 +82,7 @@ def is_in_startup_registry():
         return False
 
 class NonClosingMenu(QMenu):
+    """Custom menu that doesn't close when interacting with widgets"""
     def mouseReleaseEvent(self, e):
         action = self.activeAction()
         if action and isinstance(action, QWidgetAction):
@@ -103,13 +104,55 @@ class TransparentWindow(QMainWindow):
         self.debug_border = False
         self.enable_logging = False if getattr(sys, 'frozen', False) else False
         self.settings_file = "widget_settings.json"
+        
+        # Load settings first
         self.settings = self.load_settings()
         
+        # Initialize base properties
         self.scale = self.settings.get('scale', 100)
         self.base_width = 150
         self.base_height = 57
         
-        # Настройки osu!api
+        # Calculate current dimensions
+        current_width = int(self.base_width * (self.scale / 100))
+        current_height = int(self.base_height * (self.scale / 100))
+        
+        # Set window flags
+        flags = Qt.FramelessWindowHint | Qt.Tool
+        if self.settings.get('always_on_top', True):
+            flags |= Qt.WindowStaysOnTopHint
+        self.setWindowFlags(flags)
+        
+        # Set initial size
+        self.setFixedSize(current_width, current_height)
+        
+        # Initialize window position with proper validation
+        pos = self.settings.get('position', {'x': 100, 'y': 100})
+        screens = QApplication.screens()
+        valid_position = False
+        
+        # Validate position against all screens
+        for screen in screens:
+            screen_geo = screen.geometry()
+            x, y = pos.get('x', 0), pos.get('y', 0)
+            if (x >= screen_geo.x() and 
+                x + current_width <= screen_geo.x() + screen_geo.width() and
+                y >= screen_geo.y() and 
+                y + current_height <= screen_geo.y() + screen_geo.height()):
+                valid_position = True
+                break
+        
+        # Apply position or center on screen
+        if valid_position:
+            self.move(pos['x'], pos['y'])
+        else:
+            center = QApplication.primaryScreen().geometry().center()
+            self.move(center.x() - current_width // 2, center.y() - current_height // 2)
+        
+        # Store initial position
+        self.oldPos = self.pos()
+        
+        # Initialize API settings
         self.osu_client_id = self.settings.get('osu_client_id', '')
         self.osu_client_secret = self.settings.get('osu_client_secret', '')
         self.osu_username = self.settings.get('osu_username', '')
@@ -119,47 +162,24 @@ class TransparentWindow(QMainWindow):
         self.always_on_top = self.settings.get('always_on_top', True)
         self.enable_logging = False if getattr(sys, 'frozen', False) else self.settings.get('enable_logging', False)
         
-        # Добавляем автозапуск при первом запуске exe
+        # Add to startup if needed
         if getattr(sys, 'frozen', False) and self.settings.get('autostart', True):
             add_to_startup_registry()
-            
-        self.animation = None
         
+        self.animation = None
         self.snap_distance = 10
         self.arrow_step = 2
         
+        # Initialize UI
         self.initUI()
-        self.oldPos = self.pos()
         
-        pos = self.settings.get('position', {'x': 100, 'y': 100})
-        screens = QApplication.screens()
-        valid_position = False
-
-        current_width = int(self.base_width * (self.scale / 100))
-        current_height = int(self.base_height * (self.scale / 100))
-        
-        for screen in screens:
-            screen_geo = screen.geometry()
-            x, y = pos.get('x', 0), pos.get('y', 0)
-            if (x >= screen_geo.x() - current_width and 
-                x <= screen_geo.x() + screen_geo.width() and
-                y >= screen_geo.y() - current_height and
-                y <= screen_geo.y() + screen_geo.height()):
-                valid_position = True
-                break
-
-        if valid_position:
-            self.move(pos['x'], pos['y'])
-        else:
-            center = QApplication.primaryScreen().geometry().center()
-            self.move(center.x() - current_width // 2, center.y() - current_height // 2)
-            
-        # Добавляем таймер для автоматического обновления
+        # Setup update timer
         self.update_timer = QTimer()
         self.update_timer.timeout.connect(self.update_streak)
-        self.update_timer.start(300000)  # Обновление каждые 5 минут
+        self.update_timer.start(300000)  # Update every 5 minutes
 
     def calculate_days_since_start(self):
+        """Calculate days since start date"""
         start_date = datetime(2024, 7, 24, 0, 0, 0, tzinfo=timezone.utc)
         current_date = datetime.now(timezone.utc)
         days = (current_date - start_date).days
@@ -168,16 +188,11 @@ class TransparentWindow(QMainWindow):
         return days
 
     def get_daily_streak(self):
+        """Get current streak from osu!api"""
         try:
             if not self.osu_client_id or not self.osu_client_secret or not self.osu_username:
                 if self.enable_logging:
-                    print("[osu!api] Skipping API request - missing credentials:")
-                    if not self.osu_client_id:
-                        print("[osu!api] - Client ID is empty")
-                    if not self.osu_client_secret:
-                        print("[osu!api] - Client Secret is empty")
-                    if not self.osu_username:
-                        print("[osu!api] - Username is empty")
+                    print("[osu!api] Skipping API request - missing credentials")
                 return '0d'
                 
             if self.enable_logging:
@@ -214,27 +229,15 @@ class TransparentWindow(QMainWindow):
             if self.enable_logging:
                 print(f"[osu!api] Error getting daily streak: {e}")
             return '0d'
-
     def update_streak(self):
+        """Update streak value"""
         if self.enable_logging:
             print("[Widget] Updating streak value...")
             
-        if not self.osu_client_id or not self.osu_client_secret or not self.osu_username:
-            if self.enable_logging:
-                print("[Widget] Skipping streak update - missing credentials")
-                if not self.osu_client_id:
-                    print("[Widget] - Client ID is empty")
-                if not self.osu_client_secret:
-                    print("[Widget] - Client Secret is empty")
-                if not self.osu_username:
-                    print("[Widget] - Username is empty")
-            streak_value = "0d"
-        else:
-            streak_value = self.get_daily_streak()
-            
+        streak_value = self.get_daily_streak()
         current_template = ALTERNATIVE_TEMPLATE if self.use_alternative_template else DEFAULT_TEMPLATE
         html_content = current_template.format(
-            current_time="2025-05-20 10:20:44",
+            current_time="2025-05-20 11:16:43",
             current_user="Glebsin",
             daily_streak=streak_value
         )
@@ -244,28 +247,54 @@ class TransparentWindow(QMainWindow):
                 print(f"[Widget] Streak value updated: {streak_value}")
 
     def load_settings(self):
-        if os.path.exists(self.settings_file):
-            try:
+        """Load settings from file with validation"""
+        try:
+            if os.path.exists(self.settings_file):
                 with open(self.settings_file, 'r', encoding='utf-8') as f:
-                    settings = json.load(f)
-                    if 'always_on_top' in settings:
-                        self.always_on_top = settings['always_on_top']
-                        if not self.always_on_top:
-                            self.setWindowFlags(self.windowFlags() & ~Qt.WindowStaysOnTopHint)
-                    if 'enable_logging' in settings and not getattr(sys, 'frozen', False):
-                        self.enable_logging = settings['enable_logging']
-                    return settings
-            except Exception as e:
-                print(f"Error loading settings: {e}")
-                return {}
+                    loaded_settings = json.load(f)
+                    
+                    # Validate position if present
+                    if 'position' in loaded_settings:
+                        pos = loaded_settings['position']
+                        if not isinstance(pos, dict) or 'x' not in pos or 'y' not in pos:
+                            loaded_settings.pop('position')
+                        else:
+                            # Ensure position values are integers
+                            loaded_settings['position'] = {
+                                'x': int(pos['x']),
+                                'y': int(pos['y'])
+                            }
+                    
+                    # Validate scale
+                    if 'scale' in loaded_settings:
+                        try:
+                            scale = int(loaded_settings['scale'])
+                            if scale < 100 or scale > 500:
+                                loaded_settings['scale'] = 100
+                            else:
+                                loaded_settings['scale'] = scale
+                        except (ValueError, TypeError):
+                            loaded_settings['scale'] = 100
+                    
+                    if self.enable_logging:
+                        print(f"[Settings] Loaded settings: {loaded_settings}")
+                        
+                    return loaded_settings
+        except Exception as e:
+            if self.enable_logging:
+                print(f"[Settings] Error loading settings: {e}")
         return {}
 
     def save_settings(self):
+        """Save settings to file"""
         try:
             current_pos = {
                 'x': int(self.geometry().x()),
                 'y': int(self.geometry().y())
             }
+            
+            if self.enable_logging:
+                print(f"[Settings] Saving window position: {current_pos}")
             
             settings = {
                 'position': current_pos,
@@ -279,12 +308,14 @@ class TransparentWindow(QMainWindow):
                 'autostart': is_in_startup_registry() if getattr(sys, 'frozen', False) else False
             }
             
+            # Save to temporary file first
             temp_file = self.settings_file + '.tmp'
             with open(temp_file, 'w', encoding='utf-8') as f:
                 json.dump(settings, f, indent=2)
                 f.flush()
                 os.fsync(f.fileno())
             
+            # Atomic replacement
             if sys.platform == 'win32':
                 if os.path.exists(self.settings_file):
                     os.replace(temp_file, self.settings_file)
@@ -293,17 +324,22 @@ class TransparentWindow(QMainWindow):
             else:
                 os.rename(temp_file, self.settings_file)
                 
-            self.settings = settings
-            
+            if self.enable_logging:
+                print("[Settings] Settings saved successfully")
+                
         except Exception as e:
-            print(f"Error saving settings: {e}")
+            if self.enable_logging:
+                print(f"[Settings] Error saving settings: {e}")
+            # Fallback save attempt
             try:
                 with open(self.settings_file, 'w', encoding='utf-8') as f:
                     json.dump(settings, f)
             except Exception as e:
-                print(f"Fatal error saving settings: {e}")
+                if self.enable_logging:
+                    print(f"[Settings] Fatal error saving settings: {e}")
 
     def update_osu_settings(self, client_id=None, client_secret=None, username=None):
+        """Update osu!api settings"""
         settings_changed = False
         
         if client_id is not None:
@@ -348,60 +384,19 @@ class TransparentWindow(QMainWindow):
         if settings_changed:
             self.save_settings()
 
-    def toggle_always_on_top(self):
-        self.always_on_top = not self.always_on_top
-        flags = Qt.FramelessWindowHint | Qt.Tool
-        if self.always_on_top:
-            flags |= Qt.WindowStaysOnTopHint
-        self.setWindowFlags(flags)
-        current_pos = self.pos()
-        self.show()
-        self.move(current_pos)
-        self.save_settings()
-
-    def toggle_autostart(self):
-        if is_in_startup_registry():
-            success = remove_from_startup_registry()
-            if success:
-                self.settings['autostart'] = False
-                self.save_settings()
-        else:
-            success = add_to_startup_registry()
-            if success:
-                self.settings['autostart'] = True
-                self.save_settings()
-
-    def toggle_logging(self):
-        if not getattr(sys, 'frozen', False):
-            self.enable_logging = not self.enable_logging
-            if self.enable_logging:
-                print("[Widget] Logging enabled")
-            else:
-                print("[Widget] Logging disabled")
-            self.settings['enable_logging'] = self.enable_logging
-            self.save_settings()
-
     def initUI(self):
+        """Initialize user interface"""
         self.updateWindowStyle()
-        
-        flags = Qt.FramelessWindowHint | Qt.Tool
-        if self.always_on_top:
-            flags |= Qt.WindowStaysOnTopHint
-        self.setWindowFlags(flags)
         
         current_width = int(self.base_width * (self.scale / 100))
         current_height = int(self.base_height * (self.scale / 100))
-        
-        pos = self.settings.get('position', {'x': 100, 'y': 100})
-        
-        self.setGeometry(pos['x'], pos['y'], current_width, current_height)
-        self.setFixedSize(current_width, current_height)
 
         if hasattr(self, 'webView'):
             self.webView.deleteLater()
 
         self.webView = QWebEngineView(self)
         
+        # WebEngine settings
         settings = self.webView.settings()
         settings.setAttribute(QWebEngineSettings.LocalStorageEnabled, False)
         settings.setAttribute(QWebEngineSettings.LocalContentCanAccessRemoteUrls, False)
@@ -435,7 +430,7 @@ class TransparentWindow(QMainWindow):
         
         current_template = ALTERNATIVE_TEMPLATE if self.use_alternative_template else DEFAULT_TEMPLATE
         html_content = current_template.format(
-            current_time="2025-05-20 10:20:44",
+            current_time="2025-05-20 11:16:43",
             current_user="Glebsin",
             daily_streak="0d"
         ).replace('</style>', additional_style + '</style>')
@@ -452,7 +447,57 @@ class TransparentWindow(QMainWindow):
         
         QTimer.singleShot(100, self.update_streak)
 
+    def updateWindowStyle(self):
+        """Update window style"""
+        self.setAttribute(Qt.WA_TranslucentBackground, not self.debug_border)
+        if self.debug_border:
+            self.setStyleSheet("""
+                QMainWindow {
+                    border: 2px solid red;
+                    background-color: rgba(0, 0, 0, 10);
+                }
+            """)
+        else:
+            self.setStyleSheet("")
+
+    def toggle_always_on_top(self):
+        """Toggle always on top window state"""
+        self.always_on_top = not self.always_on_top
+        flags = Qt.FramelessWindowHint | Qt.Tool
+        if self.always_on_top:
+            flags |= Qt.WindowStaysOnTopHint
+        self.setWindowFlags(flags)
+        current_pos = self.pos()
+        self.show()
+        self.move(current_pos)
+        self.save_settings()
+
+    def toggle_autostart(self):
+        """Toggle autostart state"""
+        if is_in_startup_registry():
+            success = remove_from_startup_registry()
+            if success:
+                self.settings['autostart'] = False
+                self.save_settings()
+        else:
+            success = add_to_startup_registry()
+            if success:
+                self.settings['autostart'] = True
+                self.save_settings()
+
+    def toggle_logging(self):
+        """Toggle logging state"""
+        if not getattr(sys, 'frozen', False):
+            self.enable_logging = not self.enable_logging
+            if self.enable_logging:
+                print("[Widget] Logging enabled")
+            else:
+                print("[Widget] Logging disabled")
+            self.settings['enable_logging'] = self.enable_logging
+            self.save_settings()
+
     def updateSize(self):
+        """Update window size with animation"""
         if hasattr(self, 'animation') and self.animation and self.animation.state() == QPropertyAnimation.Running:
             self.animation.stop()
             
@@ -488,6 +533,7 @@ class TransparentWindow(QMainWindow):
         self.animation.start()
 
     def setScale(self, scale):
+        """Set widget scale"""
         old_pos = self.geometry().topLeft()
         self.scale = scale
         self.settings['scale'] = scale
@@ -495,23 +541,13 @@ class TransparentWindow(QMainWindow):
         self.updateSize()
         self.move(old_pos)
 
-    def updateWindowStyle(self):
-        self.setAttribute(Qt.WA_TranslucentBackground, not self.debug_border)
-        if self.debug_border:
-            self.setStyleSheet("""
-                QMainWindow {
-                    border: 2px solid red;
-                    background-color: rgba(0, 0, 0, 10);
-                }
-            """)
-        else:
-            self.setStyleSheet("")
-
     def toggleDebugBorder(self):
+        """Toggle debug border visibility"""
         self.debug_border = not self.debug_border
         self.updateWindowStyle()
 
     def toggle_template(self):
+        """Toggle between display templates"""
         current_pos = self.pos()
         current_scale = self.scale
         self.use_alternative_template = not self.use_alternative_template
@@ -552,7 +588,7 @@ class TransparentWindow(QMainWindow):
         current_template = ALTERNATIVE_TEMPLATE if self.use_alternative_template else DEFAULT_TEMPLATE
         streak_value = self.get_daily_streak()
         html_content = current_template.format(
-            current_time="2025-05-20 10:20:44",
+            current_time="2025-05-20 11:16:43",
             current_user="Glebsin",
             daily_streak=streak_value
         ).replace('</style>', additional_style + '</style>')
@@ -569,6 +605,7 @@ class TransparentWindow(QMainWindow):
         self.save_settings()
 
     def keyPressEvent(self, event):
+        """Handle key press events"""
         if event.key() == Qt.Key_F4 and event.modifiers() == Qt.AltModifier:
             self.closeApp()
             return
@@ -584,7 +621,7 @@ class TransparentWindow(QMainWindow):
         if len(self.key_sequence) == 3:
             if self.key_sequence == [Qt.Key_7, Qt.Key_2, Qt.Key_7]:
                 self.toggleDebugBorder()
-                print(f"Debug border toggled: {'ON' if self.debug_border else 'OFF'}")
+                print(f"Debug border {'enabled' if self.debug_border else 'disabled'}")
             self.key_sequence = []
 
         moved = False
@@ -610,12 +647,14 @@ class TransparentWindow(QMainWindow):
             self.save_settings()
 
     def mousePressEvent(self, event):
+        """Handle mouse press events"""
         if event.button() == Qt.RightButton:
             self.createContextMenu()
         else:
             self.oldPos = event.globalPos()
 
     def mouseMoveEvent(self, event):
+        """Handle mouse move events"""
         delta = QPoint(event.globalPos() - self.oldPos)
         new_pos = QPoint(self.x() + delta.x(), self.y() + delta.y())
         
@@ -654,6 +693,7 @@ class TransparentWindow(QMainWindow):
             self.save_settings()
 
     def createContextMenu(self):
+        """Create and show context menu"""
         menu = NonClosingMenu(self)
         
         # Scale widget
@@ -681,12 +721,8 @@ class TransparentWindow(QMainWindow):
         def updateScale():
             try:
                 value = int(scaleInput.text())
-                if value > 500:
-                    value = 500
-                    scaleInput.setText(str(value))
-                if value < 100:
-                    value = 100
-                    scaleInput.setText(str(value))
+                value = min(500, max(100, value))
+                scaleInput.setText(str(value))
                 self.setScale(value)
             except ValueError:
                 scaleInput.setText(str(self.scale))
@@ -704,7 +740,7 @@ class TransparentWindow(QMainWindow):
         menu.addAction(scaleAction)
         
         menu.addSeparator()
-
+        
         # osu!api settings
         osuWidget = QWidget()
         osuLayout = QVBoxLayout(osuWidget)
@@ -796,7 +832,6 @@ class TransparentWindow(QMainWindow):
         alwaysOnTopAction.triggered.connect(self.toggle_always_on_top)
         menu.addAction(alwaysOnTopAction)
         
-        # Добавляем опцию автозапуска только для exe версии
         if getattr(sys, 'frozen', False):
             autostartAction = QAction('Run at Startup', self)
             autostartAction.setCheckable(True)
@@ -804,7 +839,6 @@ class TransparentWindow(QMainWindow):
             autostartAction.triggered.connect(self.toggle_autostart)
             menu.addAction(autostartAction)
         
-        # Показываем опцию логирования только если не exe
         if not getattr(sys, 'frozen', False):
             loggingAction = QAction('Enable API Logging', self)
             loggingAction.setCheckable(True)
@@ -814,11 +848,11 @@ class TransparentWindow(QMainWindow):
         
         menu.addSeparator()
         
-        timeAction = QAction('Updated: 2025-05-20 10:25:00', self)
+        timeAction = QAction(f'Updated: 2025-05-20 11:16:43', self)
         timeAction.setEnabled(False)
         menu.addAction(timeAction)
         
-        userAction = QAction('User: Glebsin', self)
+        userAction = QAction(f'User: Glebsin', self)
         userAction.setEnabled(False)
         menu.addAction(userAction)
         
@@ -872,6 +906,7 @@ class TransparentWindow(QMainWindow):
         scaleInput.selectAll()
 
     def closeApp(self):
+        """Close the application"""
         current_pos = {
             'x': int(self.geometry().x()),
             'y': int(self.geometry().y())
@@ -887,10 +922,11 @@ class TransparentWindow(QMainWindow):
             self.webView.page().profile().clearAllVisitedLinks()
             self.webView.close()
             self.webView.deleteLater()
-
+        
         raise SystemExit('Exit button pressed')
 
     def closeEvent(self, event):
+        """Handle close event"""
         try:
             self.closeApp()
         except SystemExit:
@@ -898,6 +934,7 @@ class TransparentWindow(QMainWindow):
         event.accept()
 
 if __name__ == '__main__':
+    # Disable logging and GPU for QtWebEngine
     os.environ['QTWEBENGINE_CHROMIUM_FLAGS'] = '--disable-logging --disable-gpu --disable-software-rasterizer --disable-dev-shm-usage'
     
     app = QApplication(sys.argv)
