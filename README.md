@@ -2,6 +2,8 @@ i don't know how to code
 
 98% github copilot + 1% chatgpt + 1% me
 
+This widget is designed only for tracking the full streak of the daily challenge, so if you don't have a full streak but want to track your daily challenge completion this widget is not for you
+
 **HOW TO USE:**
 
 Launch widget.py or download executable in releases (**WARNING**: next to the executable file, a settings file widget_settings.json is created, it is better to open the executable file in a separate folder).
