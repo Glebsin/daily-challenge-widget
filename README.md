@@ -4,9 +4,11 @@ i don't know how to code
 
 **HOW TO USE:**
 
-launch widget.py or download executable in releases (**WARNING**: next to the executable file, a settings file widget_settings.json is created, it is better to open the executable file in a separate folder)
+Launch widget.py or download executable in releases (**WARNING**: next to the executable file, a settings file widget_settings.json is created, it is better to open the executable file in a separate folder)
 
-context menu on right click to use settings 
+For statistics update you need create "New OAuth Application" here - https://osu.ppy.sh/home/account/edit#oauth, then you neex open widget settings (right click) and paste Client ID and Client Secret
+
+Use context menu on right click to change settings 
 
 (scaling, always on top toggle, view update statistic time and username, exit)
 
