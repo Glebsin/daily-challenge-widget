@@ -638,14 +638,6 @@ class TransparentWindow(QMainWindow):
         menu.addAction(osuAction)
         
         menu.addSeparator()
-
-        templateAction = QAction('Use Alternative Template', self)
-        templateAction.setCheckable(True)
-        templateAction.setChecked(self.use_alternative_template)
-        templateAction.triggered.connect(self.toggle_template)
-        menu.addAction(templateAction)
-        
-        menu.addSeparator()
         
         alwaysOnTopAction = QAction('Always on Top', self)
         alwaysOnTopAction.setCheckable(True)
@@ -661,7 +653,7 @@ class TransparentWindow(QMainWindow):
         
         menu.addSeparator()
         
-        timeAction = QAction('Updated: 2025-05-20 00:26:41', self)
+        timeAction = QAction('Updated: 2025-05-20 08:30:30', self)
         timeAction.setEnabled(False)
         menu.addAction(timeAction)
         
