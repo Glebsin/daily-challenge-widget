@@ -24,7 +24,7 @@ Functions:
 5. precise movement of the widget by arrows
 
 Todo:
-1. autostart with system
-2. theme customizing
+1. theme customizing
+2. statistic update time
 
 <sub>727</sub>
