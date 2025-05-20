@@ -1,7 +1,7 @@
 import sys
 import json
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QMenu, QAction, 
                            QWidgetAction, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                            QLineEdit)
@@ -31,6 +31,7 @@ class TransparentWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.debug_border = False
+        self.enable_logging = False
         self.settings_file = "widget_settings.json"
         self.settings = self.load_settings()
         
@@ -46,6 +47,7 @@ class TransparentWindow(QMainWindow):
         self.key_sequence = []
         self.use_alternative_template = self.settings.get('use_alternative_template', False)
         self.always_on_top = self.settings.get('always_on_top', True)
+        self.enable_logging = self.settings.get('enable_logging', False)
         self.animation = None
         
         self.snap_distance = 10
@@ -82,26 +84,66 @@ class TransparentWindow(QMainWindow):
         self.update_timer.timeout.connect(self.update_streak)
         self.update_timer.start(300000)  # Обновление каждые 5 минут
 
+    def calculate_days_since_start(self):
+        start_date = datetime(2024, 7, 24, 0, 0, 0, tzinfo=timezone.utc)
+        current_date = datetime.now(timezone.utc)
+        days = (current_date - start_date).days
+        if self.enable_logging:
+            print(f"[Widget] Days since start (2024-07-24): {days}")
+        return days
+
     def get_daily_streak(self):
         try:
             if self.osu_client_id and self.osu_client_secret and self.osu_username:
+                if self.enable_logging:
+                    print(f"[osu!api] Sending request for user {self.osu_username}")
                 api = Ossapi(self.osu_client_id, self.osu_client_secret)
                 user = api.user(self.osu_username)
-                return f"{user.daily_challenge_user_stats.daily_streak_current}d"
+                streak_value = user.daily_challenge_user_stats.daily_streak_current
+                if self.enable_logging:
+                    print(f"[osu!api] Received streak value: {streak_value}")
+                
+                # Расчет дней с начальной даты
+                days_since_start = self.calculate_days_since_start()
+                
+                # Определение разницы
+                streak_difference = days_since_start - streak_value
+                
+                if self.enable_logging:
+                    print(f"[Widget] Streak difference: {streak_difference}")
+                
+                # Выбор шаблона на основе разницы
+                if streak_difference == 0:
+                    self.use_alternative_template = True
+                    if self.enable_logging:
+                        print("[Widget] Using ALTERNATIVE_TEMPLATE (streak is current)")
+                elif streak_difference == 1:
+                    self.use_alternative_template = False
+                    if self.enable_logging:
+                        print("[Widget] Using DEFAULT_TEMPLATE (streak is behind by 1 day)")
+                
+                return f"{streak_value}d"
+            if self.enable_logging:
+                print("[osu!api] Missing API credentials or username")
             return '0d'
         except Exception as e:
-            print(f"Error getting daily streak: {e}")
+            if self.enable_logging:
+                print(f"[osu!api] Error getting daily streak: {e}")
             return '0d'
 
     def update_streak(self):
+        if self.enable_logging:
+            print("[Widget] Updating streak value...")
         streak_value = self.get_daily_streak()
         current_template = ALTERNATIVE_TEMPLATE if self.use_alternative_template else DEFAULT_TEMPLATE
         html_content = current_template.format(
-            current_time="2025-05-19 23:26:07",
+            current_time="2025-05-20 00:26:41",
             current_user="Glebsin",
             daily_streak=streak_value
         )
         self.webView.setHtml(html_content)
+        if self.enable_logging:
+            print("[Widget] Streak value updated")
 
     def load_settings(self):
         if os.path.exists(self.settings_file):
@@ -112,6 +154,8 @@ class TransparentWindow(QMainWindow):
                         self.always_on_top = settings['always_on_top']
                         if not self.always_on_top:
                             self.setWindowFlags(self.windowFlags() & ~Qt.WindowStaysOnTopHint)
+                    if 'enable_logging' in settings:
+                        self.enable_logging = settings['enable_logging']
                     return settings
             except Exception as e:
                 print(f"Error loading settings: {e}")
@@ -130,6 +174,7 @@ class TransparentWindow(QMainWindow):
                 'scale': self.scale,
                 'use_alternative_template': self.use_alternative_template,
                 'always_on_top': self.always_on_top,
+                'enable_logging': self.enable_logging,
                 'osu_client_id': self.osu_client_id,
                 'osu_client_secret': self.osu_client_secret,
                 'osu_username': self.osu_username
@@ -176,6 +221,15 @@ class TransparentWindow(QMainWindow):
         else:
             self.setWindowFlags(flags & ~Qt.WindowStaysOnTopHint)
         self.show()
+        self.save_settings()
+
+    def toggle_logging(self):
+        self.enable_logging = not self.enable_logging
+        if self.enable_logging:
+            print("[Widget] Logging enabled")
+        else:
+            print("[Widget] Logging disabled")
+        self.settings['enable_logging'] = self.enable_logging
         self.save_settings()
 
     def initUI(self):
@@ -233,7 +287,7 @@ class TransparentWindow(QMainWindow):
         current_template = ALTERNATIVE_TEMPLATE if self.use_alternative_template else DEFAULT_TEMPLATE
         streak_value = self.get_daily_streak()
         html_content = current_template.format(
-            current_time="2025-05-19 23:26:07",
+            current_time="2025-05-20 00:26:41",
             current_user="Glebsin",
             daily_streak=streak_value
         ).replace('</style>', additional_style + '</style>')
@@ -347,7 +401,7 @@ class TransparentWindow(QMainWindow):
         current_template = ALTERNATIVE_TEMPLATE if self.use_alternative_template else DEFAULT_TEMPLATE
         streak_value = self.get_daily_streak()
         html_content = current_template.format(
-            current_time="2025-05-19 23:26:07",
+            current_time="2025-05-20 00:26:41",
             current_user="Glebsin",
             daily_streak=streak_value
         ).replace('</style>', additional_style + '</style>')
@@ -599,9 +653,15 @@ class TransparentWindow(QMainWindow):
         alwaysOnTopAction.triggered.connect(self.toggle_always_on_top)
         menu.addAction(alwaysOnTopAction)
         
+        loggingAction = QAction('Enable API Logging', self)
+        loggingAction.setCheckable(True)
+        loggingAction.setChecked(self.enable_logging)
+        loggingAction.triggered.connect(self.toggle_logging)
+        menu.addAction(loggingAction)
+        
         menu.addSeparator()
         
-        timeAction = QAction('Updated: 2025-05-19 23:26:07', self)
+        timeAction = QAction('Updated: 2025-05-20 00:26:41', self)
         timeAction.setEnabled(False)
         menu.addAction(timeAction)
         
