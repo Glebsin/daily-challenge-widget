@@ -14,11 +14,11 @@ functions:
 
 0. (statistic update time placeholder, user nickname placeholder)
 1. scaling from 100 to 500%
-2. scale and position save
+2. scaling and position save
 3. sticking to the edge of the screen
 4. always on top switch
+5. precise movement of the widget by arrows
 
 todo:
-1. statistic update
-2. autostart with system
-3. theme customizing
+1. autostart with system
+2. theme customizing
