@@ -4,7 +4,7 @@ i don't know how to code
 
 **HOW TO USE:**
 
-launch widget.py or download executable in releases;
+launch widget.py or download executable in releases (**WARNING**: next to the executable file, a settings file widget_settings.json is created, it is better to open the executable file in a separate folder)
 
 context menu on right click to use settings 
 
