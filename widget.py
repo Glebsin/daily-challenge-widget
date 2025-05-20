@@ -31,7 +31,7 @@ class TransparentWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.debug_border = False
-        self.enable_logging = False
+        self.enable_logging = False if getattr(sys, 'frozen', False) else False
         self.settings_file = "widget_settings.json"
         self.settings = self.load_settings()
         
@@ -47,7 +47,7 @@ class TransparentWindow(QMainWindow):
         self.key_sequence = []
         self.use_alternative_template = self.settings.get('use_alternative_template', False)
         self.always_on_top = self.settings.get('always_on_top', True)
-        self.enable_logging = self.settings.get('enable_logging', False)
+        self.enable_logging = False if getattr(sys, 'frozen', False) else self.settings.get('enable_logging', False)
         self.animation = None
         
         self.snap_distance = 10
@@ -165,7 +165,7 @@ class TransparentWindow(QMainWindow):
             
         current_template = ALTERNATIVE_TEMPLATE if self.use_alternative_template else DEFAULT_TEMPLATE
         html_content = current_template.format(
-            current_time="2025-05-20 09:06:44",
+            current_time="2025-05-20 09:37:25",
             current_user="Glebsin",
             daily_streak=streak_value
         )
@@ -183,7 +183,7 @@ class TransparentWindow(QMainWindow):
                         self.always_on_top = settings['always_on_top']
                         if not self.always_on_top:
                             self.setWindowFlags(self.windowFlags() & ~Qt.WindowStaysOnTopHint)
-                    if 'enable_logging' in settings:
+                    if 'enable_logging' in settings and not getattr(sys, 'frozen', False):
                         self.enable_logging = settings['enable_logging']
                     return settings
             except Exception as e:
@@ -203,7 +203,7 @@ class TransparentWindow(QMainWindow):
                 'scale': self.scale,
                 'use_alternative_template': self.use_alternative_template,
                 'always_on_top': self.always_on_top,
-                'enable_logging': self.enable_logging,
+                'enable_logging': self.enable_logging if not getattr(sys, 'frozen', False) else False,
                 'osu_client_id': self.osu_client_id,
                 'osu_client_secret': self.osu_client_secret,
                 'osu_username': self.osu_username
@@ -290,13 +290,14 @@ class TransparentWindow(QMainWindow):
         self.save_settings()
 
     def toggle_logging(self):
-        self.enable_logging = not self.enable_logging
-        if self.enable_logging:
-            print("[Widget] Logging enabled")
-        else:
-            print("[Widget] Logging disabled")
-        self.settings['enable_logging'] = self.enable_logging
-        self.save_settings()
+        if not getattr(sys, 'frozen', False):
+            self.enable_logging = not self.enable_logging
+            if self.enable_logging:
+                print("[Widget] Logging enabled")
+            else:
+                print("[Widget] Logging disabled")
+            self.settings['enable_logging'] = self.enable_logging
+            self.save_settings()
 
     def initUI(self):
         self.updateWindowStyle()
@@ -352,7 +353,7 @@ class TransparentWindow(QMainWindow):
         
         current_template = ALTERNATIVE_TEMPLATE if self.use_alternative_template else DEFAULT_TEMPLATE
         html_content = current_template.format(
-            current_time="2025-05-20 09:06:44",
+            current_time="2025-05-20 09:37:25",
             current_user="Glebsin",
             daily_streak="0d"
         ).replace('</style>', additional_style + '</style>')
@@ -470,7 +471,7 @@ class TransparentWindow(QMainWindow):
         current_template = ALTERNATIVE_TEMPLATE if self.use_alternative_template else DEFAULT_TEMPLATE
         streak_value = self.get_daily_streak()
         html_content = current_template.format(
-            current_time="2025-05-20 09:06:44",
+            current_time="2025-05-20 09:37:25",
             current_user="Glebsin",
             daily_streak=streak_value
         ).replace('</style>', additional_style + '</style>')
@@ -713,15 +714,17 @@ class TransparentWindow(QMainWindow):
         alwaysOnTopAction.triggered.connect(self.toggle_always_on_top)
         menu.addAction(alwaysOnTopAction)
         
-        loggingAction = QAction('Enable API Logging', self)
-        loggingAction.setCheckable(True)
-        loggingAction.setChecked(self.enable_logging)
-        loggingAction.triggered.connect(self.toggle_logging)
-        menu.addAction(loggingAction)
+        # Показываем опцию логирования только если не exe
+        if not getattr(sys, 'frozen', False):
+            loggingAction = QAction('Enable API Logging', self)
+            loggingAction.setCheckable(True)
+            loggingAction.setChecked(self.enable_logging)
+            loggingAction.triggered.connect(self.toggle_logging)
+            menu.addAction(loggingAction)
         
         menu.addSeparator()
         
-        timeAction = QAction('Updated: 2025-05-20 09:06:44', self)
+        timeAction = QAction('Updated: 2025-05-20 09:37:25', self)
         timeAction.setEnabled(False)
         menu.addAction(timeAction)
         
