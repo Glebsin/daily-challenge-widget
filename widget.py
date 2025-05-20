@@ -17,26 +17,29 @@ def add_to_startup_registry():
     try:
         if getattr(sys, 'frozen', False):
             app_path = sys.executable
+            work_dir = os.path.dirname(app_path)
+            
+            key = winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                r"Software\Microsoft\Windows\CurrentVersion\Run",
+                0,
+                winreg.KEY_SET_VALUE
+            )
+
+            command = f'cmd /c "cd /d "{work_dir}" && start "" "{app_path}""'
+            
+            winreg.SetValueEx(
+                key,
+                "DailyWidget",
+                0,
+                winreg.REG_SZ,
+                command
+            )
+            
+            winreg.CloseKey(key)
+            return True
         else:
             return False
-
-        key = winreg.OpenKey(
-            winreg.HKEY_CURRENT_USER,
-            r"Software\Microsoft\Windows\CurrentVersion\Run",
-            0,
-            winreg.KEY_SET_VALUE
-        )
-
-        winreg.SetValueEx(
-            key,
-            "DailyWidget",
-            0,
-            winreg.REG_SZ,
-            f'"{app_path}"'
-        )
-        
-        winreg.CloseKey(key)
-        return True
     except Exception as e:
         print(f"Error adding to startup: {e}")
         return False
@@ -103,7 +106,14 @@ class TransparentWindow(QMainWindow):
         super().__init__()
         self.debug_border = False
         self.enable_logging = False if getattr(sys, 'frozen', False) else False
-        self.settings_file = "widget_settings.json"
+        
+        # Get absolute path for settings file
+        if getattr(sys, 'frozen', False):
+            # If running as exe
+            self.settings_file = os.path.join(os.path.dirname(sys.executable), "widget_settings.json")
+        else:
+            # If running as script
+            self.settings_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "widget_settings.json")
         
         # Load settings first
         self.settings = self.load_settings()
@@ -186,7 +196,6 @@ class TransparentWindow(QMainWindow):
         if self.enable_logging:
             print(f"[Widget] Days since start (2024-07-24): {days}")
         return days
-
     def get_daily_streak(self):
         """Get current streak from osu!api"""
         try:
@@ -229,6 +238,7 @@ class TransparentWindow(QMainWindow):
             if self.enable_logging:
                 print(f"[osu!api] Error getting daily streak: {e}")
             return '0d'
+
     def update_streak(self):
         """Update streak value"""
         if self.enable_logging:
@@ -237,7 +247,7 @@ class TransparentWindow(QMainWindow):
         streak_value = self.get_daily_streak()
         current_template = ALTERNATIVE_TEMPLATE if self.use_alternative_template else DEFAULT_TEMPLATE
         html_content = current_template.format(
-            current_time="2025-05-20 11:16:43",
+            current_time="2025-05-20 13:22:23",
             current_user="Glebsin",
             daily_streak=streak_value
         )
@@ -249,6 +259,9 @@ class TransparentWindow(QMainWindow):
     def load_settings(self):
         """Load settings from file with validation"""
         try:
+            if self.enable_logging:
+                print(f"[Settings] Attempting to load settings from: {self.settings_file}")
+                
             if os.path.exists(self.settings_file):
                 with open(self.settings_file, 'r', encoding='utf-8') as f:
                     loaded_settings = json.load(f)
@@ -257,6 +270,8 @@ class TransparentWindow(QMainWindow):
                     if 'position' in loaded_settings:
                         pos = loaded_settings['position']
                         if not isinstance(pos, dict) or 'x' not in pos or 'y' not in pos:
+                            if self.enable_logging:
+                                print("[Settings] Invalid position format in settings")
                             loaded_settings.pop('position')
                         else:
                             # Ensure position values are integers
@@ -270,16 +285,23 @@ class TransparentWindow(QMainWindow):
                         try:
                             scale = int(loaded_settings['scale'])
                             if scale < 100 or scale > 500:
+                                if self.enable_logging:
+                                    print("[Settings] Invalid scale value, resetting to 100")
                                 loaded_settings['scale'] = 100
                             else:
                                 loaded_settings['scale'] = scale
                         except (ValueError, TypeError):
+                            if self.enable_logging:
+                                print("[Settings] Invalid scale format, resetting to 100")
                             loaded_settings['scale'] = 100
                     
                     if self.enable_logging:
-                        print(f"[Settings] Loaded settings: {loaded_settings}")
+                        print(f"[Settings] Successfully loaded settings: {loaded_settings}")
                         
                     return loaded_settings
+            else:
+                if self.enable_logging:
+                    print("[Settings] Settings file not found")
         except Exception as e:
             if self.enable_logging:
                 print(f"[Settings] Error loading settings: {e}")
@@ -288,6 +310,11 @@ class TransparentWindow(QMainWindow):
     def save_settings(self):
         """Save settings to file"""
         try:
+            # Ensure directory exists
+            settings_dir = os.path.dirname(self.settings_file)
+            if not os.path.exists(settings_dir):
+                os.makedirs(settings_dir)
+                
             current_pos = {
                 'x': int(self.geometry().x()),
                 'y': int(self.geometry().y())
@@ -295,6 +322,7 @@ class TransparentWindow(QMainWindow):
             
             if self.enable_logging:
                 print(f"[Settings] Saving window position: {current_pos}")
+                print(f"[Settings] Saving to file: {self.settings_file}")
             
             settings = {
                 'position': current_pos,
@@ -430,7 +458,7 @@ class TransparentWindow(QMainWindow):
         
         current_template = ALTERNATIVE_TEMPLATE if self.use_alternative_template else DEFAULT_TEMPLATE
         html_content = current_template.format(
-            current_time="2025-05-20 11:16:43",
+            current_time="2025-05-20 13:22:23",
             current_user="Glebsin",
             daily_streak="0d"
         ).replace('</style>', additional_style + '</style>')
@@ -588,7 +616,7 @@ class TransparentWindow(QMainWindow):
         current_template = ALTERNATIVE_TEMPLATE if self.use_alternative_template else DEFAULT_TEMPLATE
         streak_value = self.get_daily_streak()
         html_content = current_template.format(
-            current_time="2025-05-20 11:16:43",
+            current_time="2025-05-20 13:22:23",
             current_user="Glebsin",
             daily_streak=streak_value
         ).replace('</style>', additional_style + '</style>')
@@ -848,7 +876,7 @@ class TransparentWindow(QMainWindow):
         
         menu.addSeparator()
         
-        timeAction = QAction(f'Updated: 2025-05-20 11:16:43', self)
+        timeAction = QAction(f'Updated: 2025-05-20 13:22:23', self)
         timeAction.setEnabled(False)
         menu.addAction(timeAction)
         
