@@ -6,7 +6,7 @@ i don't know how to code
 
 Launch widget.py or download executable in releases (**WARNING**: next to the executable file, a settings file widget_settings.json is created, it is better to open the executable file in a separate folder)
 
-For statistics update you need create "New OAuth Application" here - https://osu.ppy.sh/home/account/edit#oauth (as an example in the "Application Callback URLs" field you can specify http://localhost:3456/), then you need open widget settings (right click) and paste Client ID and Client Secret
+For statistics update you need create "New OAuth Application" here - https://osu.ppy.sh/home/account/edit#oauth (as an example in the "Application Callback URLs" field you can specify `http://localhost:3456/`), then you need open widget settings (right click) and paste Client ID and Client Secret
 
 Use context menu on right click to change settings 
 
