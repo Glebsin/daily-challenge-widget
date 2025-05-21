@@ -32,5 +32,6 @@ Todo:
 6. make a setting to change widget refresh time (now it updating once in 5min)
 7. make right colors for all number of days
 8. make button to update widget manually
+9. made popup at hover
 
 <sub>727</sub>
