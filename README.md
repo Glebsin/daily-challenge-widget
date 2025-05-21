@@ -31,7 +31,7 @@ Todo:
 5. make a setting to change widget refresh time (now it updating once in 5min)
 6. make right colors for all number of days
 7. make button to update widget manually in context menu and f5 button
-8. make popup at hover
+8. make other statistic popup at hover
 9. make the widget not move when days number changes
 
 <sub>727</sub>
