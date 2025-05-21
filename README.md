@@ -33,5 +33,6 @@ Todo:
 7. make right colors for all number of days
 8. make button to update widget manually
 9. made popup at hover
+10. make the widget not move when days number changes
 
 <sub>727</sub>
