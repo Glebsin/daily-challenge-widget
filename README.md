@@ -31,7 +31,7 @@ Todo:
 5. correctly display update widget time (now it show date of open context menu lol)
 6. make a setting to change widget refresh time (now it updating once in 5min)
 7. make right colors for all number of days
-8. make button to update widget manually
+8. make button to update widget manually in context menu and f5 button
 9. make popup at hover
 10. make the widget not move when days number changes
 
