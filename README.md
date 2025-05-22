@@ -25,12 +25,11 @@ Functions:
 
 Todo:
 1. theme customizing
-2. make text in fields save when focus is out
-3. turn on complete (alternative) template by checking "daily_streak_best" and not by "daily_streak_current" (so that you can track your daily challenge completion)
-4. give the ability to switch the number of days to best streak or current streak
-5. make right colors for all number of days
-6. make button to update widget manually in context menu and f5 button
-7. make other statistic popup at hover
-8. make the widget not move when days number changes
+2. turn on complete (alternative) template by checking "daily_streak_best" and not by "daily_streak_current" (so that you can track your daily challenge completion)
+3. give the ability to switch the number of days to best streak or current streak
+4. make right colors for all number of days
+5. make button to update widget manually in context menu and f5 button
+6. make other statistic popup at hover
+7. make the widget not move when days number changes
 
 <sub>727</sub>
