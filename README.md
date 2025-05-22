@@ -30,6 +30,6 @@ Todo:
 4. make right colors for all number of days
 5. make a setting to change widget refresh time (now it updating once in 5min)
 6. make other statistic popup at hover
-7. make the widget not move when days number changes
+7. make static width (for 4 digits of days obviously)
 
 <sub>727</sub>
