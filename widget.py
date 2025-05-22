@@ -162,8 +162,13 @@ class TransparentWindow(QMainWindow):
             print("[Widget] Updating streak value...")
         streak_value = self.get_daily_streak()
         current_template = ALTERNATIVE_TEMPLATE if self.use_alternative_template else DEFAULT_TEMPLATE
+
+        # Use local system time for widget update display
+        local_time = datetime.now().astimezone()
+        local_time_str = local_time.strftime('%Y-%m-%d %H:%M:%S')
+
         html_content = current_template.format(
-            current_time=datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S'),
+            current_time=local_time_str,
             current_user=self.osu_username if self.osu_username else "rvany345",
             daily_streak=streak_value
         )
@@ -263,7 +268,6 @@ class TransparentWindow(QMainWindow):
                     print(f"[Settings] Fatal error saving settings: {e}")
 
     def update_osu_settings(self, client_id=None, client_secret=None, username=None):
-        # Only update and refresh if values changed!
         settings_changed = False
         updated = False
 
@@ -280,7 +284,6 @@ class TransparentWindow(QMainWindow):
             settings_changed = True
             updated = True
 
-        # Only update streak if all are filled and something changed
         if self.osu_client_id and self.osu_client_secret and self.osu_username and updated:
             if self.enable_logging:
                 print("[osu!api] Credentials updated, calling update_streak")
@@ -324,8 +327,10 @@ class TransparentWindow(QMainWindow):
             }
         """
         current_template = ALTERNATIVE_TEMPLATE if self.use_alternative_template else DEFAULT_TEMPLATE
+        local_time = datetime.now().astimezone()
+        local_time_str = local_time.strftime('%Y-%m-%d %H:%M:%S')
         html_content = current_template.format(
-            current_time=datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S'),
+            current_time=local_time_str,
             current_user=self.osu_username if self.osu_username else "rvany345",
             daily_streak="0d"
         ).replace('</style>', additional_style + '</style>')
@@ -456,8 +461,10 @@ class TransparentWindow(QMainWindow):
         """
         current_template = ALTERNATIVE_TEMPLATE if self.use_alternative_template else DEFAULT_TEMPLATE
         streak_value = self.get_daily_streak()
+        local_time = datetime.now().astimezone()
+        local_time_str = local_time.strftime('%Y-%m-%d %H:%M:%S')
         html_content = current_template.format(
-            current_time=datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S'),
+            current_time=local_time_str,
             current_user=self.osu_username if self.osu_username else "rvany345",
             daily_streak=streak_value
         ).replace('</style>', additional_style + '</style>')
@@ -484,7 +491,6 @@ class TransparentWindow(QMainWindow):
                 self.setScale(value)
             except ValueError:
                 scaleInput.setText(str(self.scale))
-            # УБРАНО: scaleInput.setFocus(), scaleInput.selectAll()
         scaleInput = SaveOnFocusOutLineEdit(updateScale)
         scaleInput.setText(str(self.scale))
         scaleInput.setFixedWidth(100)
@@ -602,7 +608,11 @@ class TransparentWindow(QMainWindow):
             loggingAction.triggered.connect(self.toggle_logging)
             menu.addAction(loggingAction)
         menu.addSeparator()
-        update_str = self.last_update_time.strftime('%Y-%m-%d %H:%M:%S') if self.last_update_time else "-"
+        if self.last_update_time:
+            local_update_time = self.last_update_time.astimezone()
+            update_str = local_update_time.strftime('%Y-%m-%d %H:%M:%S')
+        else:
+            update_str = "-"
         timeAction = QAction(f'Updated: {update_str}', self)
         timeAction.setEnabled(False)
         menu.addAction(timeAction)
