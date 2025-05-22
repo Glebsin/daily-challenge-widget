@@ -24,11 +24,11 @@ Functions:
 6. autostart
 
 Todo:
-1. theme customizing
+1. maketheme customizing
 2. turn on complete (alternative) template by checking "daily_streak_best" and not by "daily_streak_current" (so that you can track your daily challenge completion)
 3. give the ability to switch the number of days to best streak or current streak
 4. make right colors for all number of days
-5. make button to update widget manually in context menu and f5 button
+5. make a setting to change widget refresh time (now it updating once in 5min)
 6. make other statistic popup at hover
 7. make the widget not move when days number changes
 
