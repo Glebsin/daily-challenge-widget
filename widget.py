@@ -586,6 +586,12 @@ class TransparentWindow(QMainWindow):
         osuAction.setDefaultWidget(osuWidget)
         menu.addAction(osuAction)
         menu.addSeparator()
+        # Manual update button
+        manualUpdateAction = QAction('Manual Update', self)
+        manualUpdateAction.setToolTip("Click to manually refresh the widget (same as F5)")
+        manualUpdateAction.triggered.connect(self.update_streak)
+        menu.addAction(manualUpdateAction)
+        menu.addSeparator()
         alwaysOnTopAction = QAction('Always on Top', self)
         alwaysOnTopAction.setCheckable(True)
         alwaysOnTopAction.setChecked(self.always_on_top)
@@ -680,6 +686,10 @@ class TransparentWindow(QMainWindow):
             return
         if event.key() == Qt.Key_A and event.modifiers() == Qt.ControlModifier:
             event.ignore()
+            return
+        # Manual update on F5
+        if event.key() == Qt.Key_F5:
+            self.update_streak()
             return
         self.key_sequence.append(event.key())
         if len(self.key_sequence) > 3:
