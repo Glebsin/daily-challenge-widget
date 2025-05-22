@@ -12,9 +12,17 @@ from widget_templates import DEFAULT_TEMPLATE, ALTERNATIVE_TEMPLATE
 from ossapi import Ossapi
 from autostart_utils import add_to_startup_registry, remove_from_startup_registry, is_in_startup_registry
 
+class SaveOnFocusOutLineEdit(QLineEdit):
+    def __init__(self, save_callback, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.save_callback = save_callback
+
+    def focusOutEvent(self, event):
+        super().focusOutEvent(event)
+        self.save_callback()
+
 class NoSelectWebEngineView(QWebEngineView):
     def keyPressEvent(self, event):
-        # Prevent Ctrl+A selection
         if event.key() == Qt.Key_A and event.modifiers() == Qt.ControlModifier:
             event.ignore()
             return
@@ -255,43 +263,29 @@ class TransparentWindow(QMainWindow):
                     print(f"[Settings] Fatal error saving settings: {e}")
 
     def update_osu_settings(self, client_id=None, client_secret=None, username=None):
+        # Only update and refresh if values changed!
         settings_changed = False
-        if client_id is not None:
-            if not self.osu_client_secret or not self.osu_username:
-                if self.enable_logging:
-                    print("[osu!api] Missing client secret or username, skipping API request")
-                self.osu_client_id = client_id
-                settings_changed = True
-            else:
-                self.osu_client_id = client_id
-                settings_changed = True
-                if self.enable_logging:
-                    print("[osu!api] Client ID updated, all fields present")
-                self.update_streak()
-        if client_secret is not None:
-            if not self.osu_client_id or not self.osu_username:
-                if self.enable_logging:
-                    print("[osu!api] Missing client ID or username, skipping API request")
-                self.osu_client_secret = client_secret
-                settings_changed = True
-            else:
-                self.osu_client_secret = client_secret
-                settings_changed = True
-                if self.enable_logging:
-                    print("[osu!api] Client Secret updated, all fields present")
-                self.update_streak()
-        if username is not None:
-            if not self.osu_client_id or not self.osu_client_secret:
-                if self.enable_logging:
-                    print("[osu!api] Missing client ID or client secret, skipping API request")
-                self.osu_username = username
-                settings_changed = True
-            else:
-                self.osu_username = username
-                settings_changed = True
-                if self.enable_logging:
-                    print("[osu!api] Username updated, all fields present")
-                self.update_streak()
+        updated = False
+
+        if client_id is not None and client_id != self.osu_client_id:
+            self.osu_client_id = client_id
+            settings_changed = True
+            updated = True
+        if client_secret is not None and client_secret != self.osu_client_secret:
+            self.osu_client_secret = client_secret
+            settings_changed = True
+            updated = True
+        if username is not None and username != self.osu_username:
+            self.osu_username = username
+            settings_changed = True
+            updated = True
+
+        # Only update streak if all are filled and something changed
+        if self.osu_client_id and self.osu_client_secret and self.osu_username and updated:
+            if self.enable_logging:
+                print("[osu!api] Credentials updated, calling update_streak")
+            self.update_streak()
+
         if settings_changed:
             self.save_settings()
 
@@ -482,7 +476,16 @@ class TransparentWindow(QMainWindow):
         scaleLayout = QVBoxLayout(scaleWidget)
         scaleLabel = QLabel('Scale, % (100-500)')
         scaleLabel.setStyleSheet("color: white; padding: 2px 0;")
-        scaleInput = QLineEdit()
+        def updateScale():
+            try:
+                value = int(scaleInput.text())
+                value = min(500, max(100, value))
+                scaleInput.setText(str(value))
+                self.setScale(value)
+            except ValueError:
+                scaleInput.setText(str(self.scale))
+            # УБРАНО: scaleInput.setFocus(), scaleInput.selectAll()
+        scaleInput = SaveOnFocusOutLineEdit(updateScale)
         scaleInput.setText(str(self.scale))
         scaleInput.setFixedWidth(100)
         scaleInput.setStyleSheet("""
@@ -496,17 +499,6 @@ class TransparentWindow(QMainWindow):
                 border: 1px solid #4CAF50;
             }
         """)
-        def updateScale():
-            try:
-                value = int(scaleInput.text())
-                value = min(500, max(100, value))
-                scaleInput.setText(str(value))
-                self.setScale(value)
-            except ValueError:
-                scaleInput.setText(str(self.scale))
-            finally:
-                scaleInput.setFocus()
-                scaleInput.selectAll()
         scaleInput.returnPressed.connect(updateScale)
         scaleLayout.addWidget(scaleLabel)
         scaleLayout.addWidget(scaleInput)
@@ -518,7 +510,17 @@ class TransparentWindow(QMainWindow):
         osuLayout = QVBoxLayout(osuWidget)
         clientIdLabel = QLabel('osu!api Client ID')
         clientIdLabel.setStyleSheet("color: white; padding: 2px 0;")
-        clientIdInput = QLineEdit()
+        clientSecretLabel = QLabel('osu!api Client Secret')
+        clientSecretLabel.setStyleSheet("color: white; padding: 2px 0;")
+        usernameLabel = QLabel('osu! Username')
+        usernameLabel.setStyleSheet("color: white; padding: 2px 0;")
+        def updateOsuFields():
+            self.update_osu_settings(
+                clientIdInput.text(),
+                clientSecretInput.text(),
+                usernameInput.text()
+            )
+        clientIdInput = SaveOnFocusOutLineEdit(updateOsuFields)
         clientIdInput.setText(self.osu_client_id)
         clientIdInput.setPlaceholderText("Enter client ID")
         clientIdInput.setFixedWidth(200)
@@ -533,9 +535,8 @@ class TransparentWindow(QMainWindow):
                 border: 1px solid #4CAF50;
             }
         """)
-        clientSecretLabel = QLabel('osu!api Client Secret')
-        clientSecretLabel.setStyleSheet("color: white; padding: 2px 0;")
-        clientSecretInput = QLineEdit()
+        clientIdInput.returnPressed.connect(updateOsuFields)
+        clientSecretInput = SaveOnFocusOutLineEdit(updateOsuFields)
         clientSecretInput.setText(self.osu_client_secret)
         clientSecretInput.setPlaceholderText("Enter client secret")
         clientSecretInput.setFixedWidth(200)
@@ -550,9 +551,8 @@ class TransparentWindow(QMainWindow):
                 border: 1px solid #4CAF50;
             }
         """)
-        usernameLabel = QLabel('osu! Username')
-        usernameLabel.setStyleSheet("color: white; padding: 2px 0;")
-        usernameInput = QLineEdit()
+        clientSecretInput.returnPressed.connect(updateOsuFields)
+        usernameInput = SaveOnFocusOutLineEdit(updateOsuFields)
         usernameInput.setText(self.osu_username)
         usernameInput.setPlaceholderText("Enter username")
         usernameInput.setFixedWidth(200)
@@ -567,14 +567,7 @@ class TransparentWindow(QMainWindow):
                 border: 1px solid #4CAF50;
             }
         """)
-        def updateOsuSettings():
-            self.update_osu_settings(
-                clientIdInput.text(),
-                clientSecretInput.text(),
-                usernameInput.text()
-            )
-        for input_field in [clientIdInput, clientSecretInput, usernameInput]:
-            input_field.returnPressed.connect(updateOsuSettings)
+        usernameInput.returnPressed.connect(updateOsuFields)
         osuLayout.addWidget(clientIdLabel)
         osuLayout.addWidget(clientIdInput)
         osuLayout.addWidget(clientSecretLabel)
@@ -586,7 +579,6 @@ class TransparentWindow(QMainWindow):
         osuAction.setDefaultWidget(osuWidget)
         menu.addAction(osuAction)
         menu.addSeparator()
-        # Manual update button
         manualUpdateAction = QAction('Manual Update', self)
         manualUpdateAction.setToolTip("Click to manually refresh the widget (same as F5)")
         manualUpdateAction.triggered.connect(self.update_streak)
@@ -687,7 +679,6 @@ class TransparentWindow(QMainWindow):
         if event.key() == Qt.Key_A and event.modifiers() == Qt.ControlModifier:
             event.ignore()
             return
-        # Manual update on F5
         if event.key() == Qt.Key_F5:
             self.update_streak()
             return
