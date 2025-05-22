@@ -24,7 +24,7 @@ Functions:
 6. autostart
 
 Todo:
-1. maketheme customizing
+1. make theme customizing
 2. turn on complete (alternative) template by checking "daily_streak_best" and not by "daily_streak_current" (so that you can track your daily challenge completion)
 3. give the ability to switch the number of days to best streak or current streak
 4. make right colors for all number of days
