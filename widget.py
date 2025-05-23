@@ -56,7 +56,7 @@ class TransparentWindow(QMainWindow):
 
         self.settings = self.load_settings()
         self.scale = self.settings.get('scale', 100)
-        self.base_width = 150
+        self.base_width = 160
         self.base_height = 57
         current_width = int(self.base_width * (self.scale / 100))
         current_height = int(self.base_height * (self.scale / 100))

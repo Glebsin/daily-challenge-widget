@@ -8,7 +8,7 @@ DEFAULT_TEMPLATE = """
   }}
 
   html, body {{
-    width: 150px;
+    width: 160px;
     height: 57px;
     margin: 0;
     padding: 0;
@@ -58,7 +58,7 @@ DEFAULT_TEMPLATE = """
 
   .osu-page {{
     background: transparent !important;
-    width: 150px;
+    width: 160px;
     height: 57px;
     display: flex;
     justify-content: center;
@@ -68,7 +68,7 @@ DEFAULT_TEMPLATE = """
 
   .profile-detail__values {{
     background: transparent !important;
-    width: 150px;
+    width: 160px;
     height: 57px;
     display: flex;
     justify-content: center;
@@ -100,12 +100,23 @@ DEFAULT_TEMPLATE = """
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    width: 100%;
   }}
 
   .daily-challenge__value-box {{
     background: hsl(var(--hsl-b6));
     border-radius: 3px;
     padding: 5px 10px;
+    width: 67.75px;
+    box-sizing: border-box;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
   }}
 </style></head>
 <body style="--base-hue-default: 333; --base-hue-override: 333">
@@ -133,7 +144,7 @@ ALTERNATIVE_TEMPLATE = """
 }}
 
 html, body {{
-    width: 150px;
+    width: 160px;
     height: 57px;
     margin: 0;
     padding: 0;
@@ -205,13 +216,24 @@ body {{
     --colour: hsl(var(--hsl-c2));
     -webkit-background-clip: text;
     background-image: linear-gradient(var(--colour));
-    color: transparent
+    color: transparent;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    width: 100%;
 }}
 
 .daily-challenge__value-box {{
     background: hsl(var(--hsl-b6));
     border-radius: 3px;
-    padding: 5px 10px
+    padding: 5px 10px;
+    width: 67.75px;
+    box-sizing: border-box;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
 }}
 
 .profile-detail {{
