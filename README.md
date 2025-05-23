@@ -12,7 +12,7 @@ Download executable in releases or compile widget.py (ask copilot or chatgpt how
 
 For statistics update you need create "New OAuth Application" here - https://osu.ppy.sh/home/account/edit#oauth (as an example in the "Application Callback URLs" field you can specify `http://localhost:3456/`), then you need open widget settings (right click) and paste Client ID, Client Secret and username.
 
-Use context menu on right click to change settings (scaling, always on top toggle, run at startup toggle, view update statistic time, exit).
+Use context menu on right click to change settings (scaling, always on top toggle, run at startup toggle, change updating time, view last update statistic time, exit).
 
 Functions:
 
