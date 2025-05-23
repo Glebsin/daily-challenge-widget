@@ -32,5 +32,6 @@ Todo:
 4. make right colors for all number of days
 5. make other statistic popup at hover
 6. if widget updated manually update time in live in context menu
+7. constantly check if selection works on ctrl + a (it shouldn't work like that)
 
 <sub>727</sub>
