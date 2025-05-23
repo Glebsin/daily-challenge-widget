@@ -3,7 +3,7 @@ import json
 import os
 from datetime import datetime, timezone, timedelta
 from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QMenu, QAction, QWidgetAction, QWidget, QVBoxLayout, QLabel, QLineEdit
+    QApplication, QMainWindow, QMenu, QAction, QWidgetAction, QWidget, QVBoxLayout, QLabel, QLineEdit, QComboBox, QHBoxLayout
 )
 from PyQt5.QtCore import Qt, QPoint, QPropertyAnimation, QEasingCurve, QRect, QTimer
 from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineSettings, QWebEngineProfile
@@ -44,6 +44,14 @@ class NonClosingMenu(QMenu):
             super().keyPressEvent(e)
 
 class TransparentWindow(QMainWindow):
+    UPDATE_INTERVALS = [
+        (5 * 60 * 1000, "5 minutes"),
+        (10 * 60 * 1000, "10 minutes"),
+        (15 * 60 * 1000, "15 minutes"),
+        (30 * 60 * 1000, "30 minutes"),
+        (60 * 60 * 1000, "60 minutes"),
+    ]
+
     def __init__(self):
         super().__init__()
         self.debug_border = False
@@ -102,12 +110,14 @@ class TransparentWindow(QMainWindow):
         self.snap_distance = 10
         self.arrow_step = 2
 
-        self.last_update_time = None  # Track last osu!api update time
+        self.last_update_time = None
+
+        self.update_interval = self.settings.get('update_interval', TransparentWindow.UPDATE_INTERVALS[0][0])
 
         self.initUI()
         self.update_timer = QTimer()
-        self.update_timer.timeout.connect(self.update_streak)
-        self.update_timer.start(300000)
+        self.update_timer.timeout.connect(self._on_update_timer)
+        self.update_timer.start(self.update_interval)
 
     def calculate_days_since_start(self):
         start_date = datetime(2024, 7, 24, 0, 0, 0, tzinfo=timezone.utc)
@@ -162,11 +172,8 @@ class TransparentWindow(QMainWindow):
             print("[Widget] Updating streak value...")
         streak_value = self.get_daily_streak()
         current_template = ALTERNATIVE_TEMPLATE if self.use_alternative_template else DEFAULT_TEMPLATE
-
-        # Use local system time for widget update display
         local_time = datetime.now().astimezone()
         local_time_str = local_time.strftime('%Y-%m-%d %H:%M:%S')
-
         html_content = current_template.format(
             current_time=local_time_str,
             current_user=self.osu_username if self.osu_username else "rvany345",
@@ -177,6 +184,14 @@ class TransparentWindow(QMainWindow):
             if self.enable_logging:
                 print(f"[Widget] Streak value updated: {streak_value}")
                 print(f"[Widget] Using {'ALTERNATIVE' if self.use_alternative_template else 'DEFAULT'} template")
+        # обновим время последнего обновления
+        self.last_update_time = datetime.now(timezone.utc)
+
+    def _on_update_timer(self):
+        self.update_streak()
+        # после первого срабатывания выставляем таймер на полный интервал
+        self.update_timer.stop()
+        self.update_timer.start(self.update_interval)
 
     def load_settings(self):
         try:
@@ -241,7 +256,8 @@ class TransparentWindow(QMainWindow):
                 'osu_client_id': self.osu_client_id,
                 'osu_client_secret': self.osu_client_secret,
                 'osu_username': self.osu_username,
-                'autostart': is_in_startup_registry() if getattr(sys, 'frozen', False) else False
+                'autostart': is_in_startup_registry() if getattr(sys, 'frozen', False) else False,
+                'update_interval': self.update_interval,
             }
             temp_file = self.settings_file + '.tmp'
             with open(temp_file, 'w', encoding='utf-8') as f:
@@ -291,6 +307,30 @@ class TransparentWindow(QMainWindow):
 
         if settings_changed:
             self.save_settings()
+
+    def set_update_interval(self, interval_ms):
+        self.update_interval = interval_ms
+        self.settings['update_interval'] = interval_ms
+        self.save_settings()
+
+        now = datetime.now(timezone.utc)
+        # если последнее обновление не было, обновим сейчас
+        if self.last_update_time is None:
+            self.last_update_time = now
+        elapsed = (now - self.last_update_time).total_seconds() * 1000  # мс
+        time_to_next = max(0, self.update_interval - elapsed)
+
+        self.update_timer.stop()
+        self.update_timer.start(int(time_to_next))
+        if self.enable_logging:
+            print(f"[Widget] Update interval set to {interval_ms // 60000} minutes (next update in {int(time_to_next/1000)} sec)")
+
+        def restart_timer():
+            self.update_timer.stop()
+            self.update_timer.start(self.update_interval)
+            self.update_timer.timeout.disconnect(restart_timer)
+        if time_to_next > 0:
+            self.update_timer.timeout.connect(restart_timer)
 
     def initUI(self):
         self.updateWindowStyle()
@@ -607,6 +647,60 @@ class TransparentWindow(QMainWindow):
             loggingAction.setChecked(self.enable_logging)
             loggingAction.triggered.connect(self.toggle_logging)
             menu.addAction(loggingAction)
+
+        menu.addSeparator()
+        intervalWidget = QWidget()
+        intervalLayout = QHBoxLayout(intervalWidget)
+        intervalLabel = QLabel('Update interval')
+        intervalLabel.setStyleSheet("color: white; padding: 2px 0;")
+        intervalCombo = QComboBox()
+
+        # синхронизируем высоту поля и пунктов выпадающего списка
+        desired_height = 28
+        intervalCombo.setStyleSheet(f"""
+QComboBox {{
+    background-color: #222;
+    color: white;
+    border: 1px solid #4D4D4D;
+    padding: 0 10px 0 3px;
+    min-width: 100px;
+    height: {desired_height}px;
+    font-size: 14px;
+}}
+QComboBox QAbstractItemView {{
+    background-color: #222;
+    color: white;
+    border: 1px solid #4D4D4D;
+    selection-background-color: #333;
+    selection-color: white;
+    outline: none;
+}}
+QComboBox QAbstractItemView::item {{
+    height: {desired_height}px;
+    min-height: {desired_height}px;
+    max-height: {desired_height}px;
+    font-size: 14px;
+    padding: 0 10px;
+}}
+""")
+        intervalCombo.setFixedHeight(desired_height)
+        intervalCombo.view().setStyleSheet(f"QListView::item{{height: {desired_height}px;}}")
+
+        for idx, (interval, label) in enumerate(TransparentWindow.UPDATE_INTERVALS):
+            intervalCombo.addItem(label, interval)
+            if interval == self.update_interval:
+                intervalCombo.setCurrentIndex(idx)
+        def onIntervalChanged(idx):
+            value = intervalCombo.itemData(idx)
+            self.set_update_interval(value)
+        intervalCombo.currentIndexChanged.connect(onIntervalChanged)
+        intervalLayout.addWidget(intervalLabel)
+        intervalLayout.addWidget(intervalCombo)
+        intervalWidget.setLayout(intervalLayout)
+        intervalAction = QWidgetAction(menu)
+        intervalAction.setDefaultWidget(intervalWidget)
+        menu.addAction(intervalAction)
+
         menu.addSeparator()
         if self.last_update_time:
             local_update_time = self.last_update_time.astimezone()
