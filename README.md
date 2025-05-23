@@ -22,7 +22,8 @@ Functions:
 4. always on top switch
 5. precise movement of the widget by arrows
 6. autostart
-7. 
+7. manual update
+8. ability to change widget update time
 
 Todo:
 1. make theme customizing
