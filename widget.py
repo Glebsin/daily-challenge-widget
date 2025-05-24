@@ -120,12 +120,10 @@ class TransparentWindow(QMainWindow):
         self.update_timer.start(self.update_interval)
 
     def calculate_days_since_start(self):
-        start_date = datetime(2024, 7, 24, 0, 0, 0, tzinfo=timezone.utc)
-        current_date = datetime.now(timezone.utc)
-        days = (current_date - start_date).days
-        if self.enable_logging:
-            print(f"[Widget] Days since start (2024-07-24): {days}")
-        return days
+        """Возвращает текущую дату на компьютере в формате 'YYYY-MM-DD'"""
+        now = datetime.now(timezone.utc)
+        date_only = now.strftime('%Y-%m-%d')
+        return date_only
 
     def get_daily_streak(self):
         try:
@@ -139,21 +137,36 @@ class TransparentWindow(QMainWindow):
             try:
                 api = Ossapi(self.osu_client_id, self.osu_client_secret)
                 user = api.user(self.osu_username)
-                streak_value = user.daily_challenge_user_stats.daily_streak_current
+                streak_value = user.daily_challenge_user_stats.playcount
+                last_update_date = user.daily_challenge_user_stats.last_update  # Может быть строка или datetime
+
+                # Получаем дату в формате YYYY-MM-DD из last_update_date
+                if isinstance(last_update_date, str):
+                    last_update_str = last_update_date.split(" ")[0]
+                elif isinstance(last_update_date, datetime):
+                    last_update_str = last_update_date.strftime('%Y-%m-%d')
+                else:
+                    last_update_str = None
+
+                today_str = self.calculate_days_since_start()  # Текущая дата в формате YYYY-MM-DD
+
                 if self.enable_logging:
-                    print(f"[osu!api] Received streak value: {streak_value}")
-                days_since_start = self.calculate_days_since_start()
-                streak_difference = days_since_start - streak_value
-                if self.enable_logging:
-                    print(f"[Widget] Streak difference: {streak_difference}")
-                if streak_difference == 0:
+                    print(f"[Widget] Today: {today_str}, Last update: {last_update_str}")
+
+                try:
+                    today_dt = datetime.strptime(today_str, '%Y-%m-%d')
+                    last_update_dt = datetime.strptime(last_update_str, '%Y-%m-%d')
+                    date_diff = (today_dt - last_update_dt).days
+                except Exception as e:
                     if self.enable_logging:
-                        print("[Widget] Setting ALTERNATIVE_TEMPLATE (streak is current)")
+                        print(f"[Widget] Date calculation error: {e}")
+                    date_diff = 0
+
+                if date_diff == 0:
                     self.use_alternative_template = True
                 else:
-                    if self.enable_logging:
-                        print("[Widget] Setting DEFAULT_TEMPLATE (streak is behind)")
                     self.use_alternative_template = False
+
                 self.last_update_time = datetime.now(timezone.utc)
                 return f"{streak_value}d"
             except Exception as api_error:
@@ -176,7 +189,7 @@ class TransparentWindow(QMainWindow):
         local_time_str = local_time.strftime('%Y-%m-%d %H:%M:%S')
         html_content = current_template.format(
             current_time=local_time_str,
-            current_user=self.osu_username if self.osu_username else "rvany345",
+            current_user=self.osu_username,
             daily_streak=streak_value
         )
         if hasattr(self, 'webView'):
@@ -184,12 +197,10 @@ class TransparentWindow(QMainWindow):
             if self.enable_logging:
                 print(f"[Widget] Streak value updated: {streak_value}")
                 print(f"[Widget] Using {'ALTERNATIVE' if self.use_alternative_template else 'DEFAULT'} template")
-        # обновим время последнего обновления
         self.last_update_time = datetime.now(timezone.utc)
 
     def _on_update_timer(self):
         self.update_streak()
-        # после первого срабатывания выставляем таймер на полный интервал
         self.update_timer.stop()
         self.update_timer.start(self.update_interval)
 
@@ -244,9 +255,7 @@ class TransparentWindow(QMainWindow):
                 'x': int(self.geometry().x()),
                 'y': int(self.geometry().y())
             }
-            if self.enable_logging:
-                print(f"[Settings] Saving window position: {current_pos}")
-                print(f"[Settings] Saving to file: {self.settings_file}")
+            # --- ЛОГИРОВАНИЕ СОХРАНЕНИЯ ПОЗИЦИИ УДАЛЕНО ---
             settings = {
                 'position': current_pos,
                 'scale': self.scale,
@@ -271,8 +280,7 @@ class TransparentWindow(QMainWindow):
                     os.rename(temp_file, self.settings_file)
             else:
                 os.rename(temp_file, self.settings_file)
-            if self.enable_logging:
-                print("[Settings] Settings saved successfully")
+            # --- ЛОГИРОВАНИЕ УСПЕШНОГО СОХРАНЕНИЯ УДАЛЕНО ---
         except Exception as e:
             if self.enable_logging:
                 print(f"[Settings] Error saving settings: {e}")
@@ -314,10 +322,9 @@ class TransparentWindow(QMainWindow):
         self.save_settings()
 
         now = datetime.now(timezone.utc)
-        # если последнее обновление не было, обновим сейчас
         if self.last_update_time is None:
             self.last_update_time = now
-        elapsed = (now - self.last_update_time).total_seconds() * 1000  # мс
+        elapsed = (now - self.last_update_time).total_seconds() * 1000  
         time_to_next = max(0, self.update_interval - elapsed)
 
         self.update_timer.stop()
@@ -371,7 +378,7 @@ class TransparentWindow(QMainWindow):
         local_time_str = local_time.strftime('%Y-%m-%d %H:%M:%S')
         html_content = current_template.format(
             current_time=local_time_str,
-            current_user=self.osu_username if self.osu_username else "rvany345",
+            current_user=self.osu_username,
             daily_streak="0d"
         ).replace('</style>', additional_style + '</style>')
         self.webView.page().setBackgroundColor(Qt.transparent)
@@ -505,7 +512,7 @@ class TransparentWindow(QMainWindow):
         local_time_str = local_time.strftime('%Y-%m-%d %H:%M:%S')
         html_content = current_template.format(
             current_time=local_time_str,
-            current_user=self.osu_username if self.osu_username else "rvany345",
+            current_user=self.osu_username,
             daily_streak=streak_value
         ).replace('</style>', additional_style + '</style>')
         self.webView.page().setBackgroundColor(Qt.transparent)
@@ -654,8 +661,6 @@ class TransparentWindow(QMainWindow):
         intervalLabel = QLabel('Update interval')
         intervalLabel.setStyleSheet("color: white; padding: 2px 0;")
         intervalCombo = QComboBox()
-
-        # синхронизируем высоту поля и пунктов выпадающего списка
         desired_height = 28
         intervalCombo.setStyleSheet(f"""
 QComboBox {{
@@ -814,6 +819,7 @@ QComboBox QAbstractItemView::item {{
                 'y': int(self.geometry().y())
             }
             self.save_settings()
+        # Не выводим логи о перемещении даже если enable_logging True
 
     def mousePressEvent(self, event):
         if event.button() == Qt.RightButton:
