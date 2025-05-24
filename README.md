@@ -30,7 +30,5 @@ Todo:
 2. make other statistic popup at hover
 3. give the ability to switch the number of days to best streak or current streak or total participation
 4. make right colors for all number of days
-5. if widget updated manually update time in live in context menu
-6. constantly check if selection works on ctrl + a (it shouldn't work like that)
 
 <sub>727</sub>
