@@ -4,7 +4,7 @@ i don't know how to code
 
 98% github copilot + 1% chatgpt + 1% me
 
-This widget is designed for tracking streak of the daily challenge
+This widget is designed for tracking daily challenge completion
 
 **HOW TO USE:**
 
