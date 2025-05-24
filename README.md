@@ -1,3 +1,7 @@
+<h1 align="center">
+    DCCW (Daily challenge completion widget)
+</h1>
+
 **TESTED ONLY ON WINDOWS 10**
 
 i don't know how to code
