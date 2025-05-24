@@ -4,7 +4,7 @@ i don't know how to code
 
 98% github copilot + 1% chatgpt + 1% me
 
-This widget is designed only for tracking the full streak of the daily challenge, so if you don't have a full streak but want to track your daily challenge completion this widget is not for you
+This widget is designed for tracking streak of the daily challenge
 
 **HOW TO USE:**
 
@@ -31,7 +31,6 @@ Todo:
 3. give the ability to switch the number of days to best streak or current streak or total participation
 4. make right colors for all number of days
 5. if widget updated manually update time in live in context menu
-6. turn on complete (alternative) template by checking "last_update" and not by "daily_streak_current" (so that you can track your daily challenge completion)
-7. constantly check if selection works on ctrl + a (it shouldn't work like that)
+6. constantly check if selection works on ctrl + a (it shouldn't work like that)
 
 <sub>727</sub>
