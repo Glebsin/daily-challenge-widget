@@ -2,6 +2,8 @@
     DCCW (Daily challenge completion widget)
 </h1>
 
+[<img src="misc/images/button-download.png">](https://github.com/Glebsin/Daily-challenge-completion-widget/releases/tag/2025.524.0)
+
 **TESTED ONLY ON WINDOWS 10**
 
 i don't know how to code
